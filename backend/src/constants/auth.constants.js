@@ -1,0 +1,22 @@
+const AUTH_PROVIDERS = {
+  LOCAL: 'local',
+  GOOGLE: 'google'
+}
+
+const USER_ROLES = {
+  USER: 'user',
+  ADMIN: 'admin',
+  SUPPORT: 'support'
+}
+
+module.exports = {
+  AUTH_PROVIDERS,
+  USER_ROLES,
+  OTP_DIGITS: 6,
+  ACCESS_TOKEN_COOKIE_NAME: 'accessToken',
+  REFRESH_TOKEN_COOKIE_NAME: 'refreshToken',
+  ACCESS_TOKEN_EXPIRES_IN: '15m',
+  REFRESH_TOKEN_EXPIRES_IN: '7d',
+  ACCESS_TOKEN_COOKIE_MAX_AGE_MS: 15 * 60 * 1000,
+  REFRESH_TOKEN_COOKIE_MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000
+}
