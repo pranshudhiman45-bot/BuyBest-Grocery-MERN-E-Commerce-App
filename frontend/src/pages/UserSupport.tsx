@@ -147,7 +147,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
   return (
     <div className="min-h-full bg-[#f7f4ee] text-[#262118]">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-6 px-3 pb-12 pt-4 md:px-5">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-3 pb-12 pt-4 md:px-5">
         
         {/* Support Header Section - Matching Offers Page Gradient */}
         <section className="overflow-hidden rounded-[30px] border border-[#ece4d6] bg-[linear-gradient(135deg,#fffdf9_0%,#f8f4ea_48%,#eef8ee_100%)] shadow-[0_18px_40px_rgba(78,62,31,0.08)]">
@@ -199,7 +199,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
                   <textarea
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
-                    className="w-full min-h-[120px] p-4 rounded-2xl border border-[#e8dfcf] bg-[#fdfbf6] text-sm font-medium text-[#2a2217] shadow-sm outline-none transition-colors hover:border-[#d4c3a3] focus:border-[#a78410] focus:ring-1 focus:ring-[#a78410] resize-none"
+                    className="w-full min-h-30 p-4 rounded-2xl border border-[#e8dfcf] bg-[#fdfbf6] text-sm font-medium text-[#2a2217] shadow-sm outline-none transition-colors hover:border-[#d4c3a3] focus:border-[#a78410] focus:ring-1 focus:ring-[#a78410] resize-none"
                     placeholder="Provide details about your issue..."
                     required
                   />
@@ -216,7 +216,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
             </div>
 
             {/* Ticket List Card */}
-            <div className="rounded-[28px] border border-[#ece4d6] bg-white p-6 shadow-[0_12px_28px_rgba(78,62,31,0.06)] sm:p-8 flex min-h-[320px] flex-col md:min-h-[420px] lg:min-h-[550px]">
+            <div className="rounded-[28px] border border-[#ece4d6] bg-white p-6 shadow-[0_12px_28px_rgba(78,62,31,0.06)] sm:p-8 flex min-h-80 flex-col md:min-h-105 lg:min-h-137.5">
               <div className="flex items-center gap-3 mb-6 shrink-0">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fdf6e3] text-[#b08b16]">
                   <TicketIcon className="h-5 w-5" />
@@ -248,7 +248,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
                       <div className="flex justify-between items-start mb-2 gap-2">
                         <h3 className="font-semibold text-[#2a2217] line-clamp-1">{ticket.title}</h3>
                         <span
-                          className={`shrink-0 text-[10px] font-bold uppercase tracking-[0.1em] px-2.5 py-1 rounded-full ${
+                          className={`shrink-0 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${
                             ticket.status === "open" 
                               ? "bg-[#ccffcf]/60 text-[#1a5b32] border border-[#a3e6a9]" 
                               : "bg-[#f2f2f2] text-[#6b6b6b] border border-[#e0e0e0]"
@@ -273,7 +273,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
           </div>
         ) : (
           /* Active Chat View */
-          <div className="bg-white flex min-h-[65svh] flex-col overflow-hidden rounded-[30px] border border-[#ece4d6] shadow-[0_18px_40px_rgba(78,62,31,0.08)] sm:min-h-[70svh] lg:min-h-[650px] lg:max-h-[85vh]">
+          <div className="bg-white flex min-h-[65svh] flex-col overflow-hidden rounded-[30px] border border-[#ece4d6] shadow-[0_18px_40px_rgba(78,62,31,0.08)] sm:min-h-[70svh] lg:min-h-162.5 lg:max-h-[85vh]">
             
             {/* Chat Header */}
             <div className="bg-[linear-gradient(135deg,#fffdf9_0%,#f8f4ea_100%)] p-4 sm:p-5 flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-[#ece4d6] gap-3">
@@ -336,7 +336,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
                             </>
                           )}
                         </div>
-                        <p className="break-words">{msg.text}</p>
+                        <p className="wrap-break-word">{msg.text}</p>
                       </div>
                     </div>
                   </div>
