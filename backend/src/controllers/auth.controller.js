@@ -1,6 +1,8 @@
 const asyncHandler = require('../utils/async-handler.js')
 const authService = require('../services/auth.service.js')
 const env = require('../config/env.js')
+const AppError = require('../utils/app-error.js')
+const passport = require('passport')
 
 const sendFrontendRedirect = (res, targetUrl) => {
   const safeUrl = JSON.stringify(targetUrl)
@@ -23,6 +25,81 @@ const sendFrontendRedirect = (res, targetUrl) => {
     <p>Redirecting to the app...</p>
   </body>
 </html>`)
+}
+
+const getAllowedFrontendOrigins = () =>
+  Array.from(
+    new Set(
+      [env.frontendUrl, ...env.corsOrigins]
+        .filter(Boolean)
+        .map((value) => {
+          try {
+            return new URL(value).origin
+          } catch {
+            return null
+          }
+        })
+        .filter(Boolean)
+    )
+  )
+
+const resolveFrontendRedirectUrl = (returnTo) => {
+  const fallbackUrl = new URL(env.frontendUrl)
+
+  if (!returnTo) {
+    return fallbackUrl
+  }
+
+  try {
+    const requestedUrl = new URL(returnTo)
+
+    if (!getAllowedFrontendOrigins().includes(requestedUrl.origin)) {
+      return fallbackUrl
+    }
+
+    return requestedUrl
+  } catch {
+    return fallbackUrl
+  }
+}
+
+const appendRedirectStatus = (returnTo, params) => {
+  const targetUrl = resolveFrontendRedirectUrl(returnTo)
+
+  for (const [key, value] of Object.entries(params)) {
+    targetUrl.searchParams.set(key, value)
+  }
+
+  return targetUrl.toString()
+}
+
+const startGoogleAuth = (req, res, next) => {
+  const returnTo =
+    typeof req.query.returnTo === 'string' ? req.query.returnTo : ''
+
+  return passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    state: returnTo
+  })(req, res, next)
+}
+
+const completeGoogleAuth = (req, res, next) => {
+  return passport.authenticate(
+    'google',
+    { session: false },
+    (error, user) => {
+      if (error) {
+        return next(error)
+      }
+
+      if (!user) {
+        return next(new AppError('Google authentication failed', 401))
+      }
+
+      req.user = user
+      return next()
+    }
+  )(req, res, next)
 }
 
 const registerUser = asyncHandler(async (req, res) => {
@@ -57,8 +134,20 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 const googleAuthCallback = asyncHandler(async (req, res) => {
   await authService.googleAuthCallback(req.user, res)
-  return sendFrontendRedirect(res, `${env.frontendUrl}/?googleAuth=success`)
+  return sendFrontendRedirect(
+    res,
+    appendRedirectStatus(req.query.state, { googleAuth: 'success' })
+  )
 })
+
+const googleAuthFailure = (req, res) => {
+  return sendFrontendRedirect(
+    res,
+    appendRedirectStatus(req.query.state, {
+      error: 'Google authentication failed'
+    })
+  )
+}
 
 const loginUser = asyncHandler(async (req, res) => {
   const response = await authService.loginUser(req.body, res)
@@ -88,6 +177,9 @@ const verifyNewEmail = asyncHandler(async (req, res) => {
   res.status(response.statusCode).json(response.body);
 });
 module.exports = {
+  startGoogleAuth,
+  completeGoogleAuth,
+  googleAuthFailure,
   registerUser,
   getCurrentUser,
   verifyRegistrationOtp,

@@ -105,7 +105,9 @@ export function LoginForm({
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = getApiUrl("/api/auth/google")
+    const googleLoginUrl = new URL(getApiUrl("/api/auth/google"))
+    googleLoginUrl.searchParams.set("returnTo", window.location.href)
+    window.location.href = googleLoginUrl.toString()
   }
 
   const switchToForgotPassword = () => {

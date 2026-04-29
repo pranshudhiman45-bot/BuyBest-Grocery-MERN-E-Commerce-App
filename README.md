@@ -118,10 +118,22 @@ Reference: [backend/.env.example](/Users/pranshudhiman/Desktop/Intern Ship/NodeJ
 
 ### 3. Configure the frontend
 
-The frontend uses one optional env variable:
+Create the frontend env file:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+The frontend uses one env variable:
 
 ```env
 VITE_API_URL=http://localhost:3000
+```
+
+For the current deployed backend, use:
+
+```env
+VITE_API_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com
 ```
 
 If omitted, it defaults to `http://localhost:3000`.
@@ -219,4 +231,5 @@ Current default development credentials:
 - Some backend route and file names intentionally use `catagory` instead of `category`; docs keep the public route names as implemented.
 - The frontend expects credentialed API requests, so cookie, CORS, and frontend/backend origin settings must stay aligned.
 - Socket.IO support chat uses the same backend server and validates the access-token cookie during connection.
+- The frontend now has a shared env template at [frontend/.env.example](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/frontend/.env.example); keep real environment-specific values in `frontend/.env`.
 - `RESET_PASSWORD_URL` should point to the frontend reset-password page, usually `http://localhost:5173/reset-password` in local development.

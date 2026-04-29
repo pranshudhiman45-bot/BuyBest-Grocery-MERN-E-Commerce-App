@@ -3,29 +3,17 @@ const authController = require('../controllers/auth.controller.js')
 const { authMiddleware } = require('../middlewares/auth.middleware.js')
 const { createRateLimit } = require('../middlewares/rate-limit.middleware.js')
 const { avatarUpload } = require('../middlewares/upload.middleware.js')
-const env = require('../config/env.js')
 
 const router = express.Router()
-const passport = require('passport')
 const authRateLimit = createRateLimit({
   keyPrefix: 'auth',
   maxRequests: 8,
   message: 'Too many authentication attempts. Please wait a few minutes and try again.'
 })
 
-router.get(
-  '/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-)
-
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    session: false,
-    failureRedirect: `${env.frontendUrl}/login?error=Google%20authentication%20failed`
-  }),
-  authController.googleAuthCallback
-)
+router.get('/google', authController.startGoogleAuth)
+router.get('/google/callback', authController.completeGoogleAuth, authController.googleAuthCallback)
+router.get('/google/failure', authController.googleAuthFailure)
 router.post('/register', authRateLimit, authController.registerUser)
 router.get('/me', authMiddleware, authController.getCurrentUser)
 router.post('/verify-otp', authRateLimit, authController.verifyRegistrationOtp)

@@ -38,22 +38,27 @@ const createRefreshToken = userId =>
     expiresIn: REFRESH_TOKEN_EXPIRES_IN
   })
 
+const getCookieOptions = maxAge => ({
+  httpOnly: true,
+  sameSite: env.nodeEnv === 'production' ? 'none' : 'strict',
+  secure: env.nodeEnv === 'production',
+  ...(typeof maxAge === 'number' ? { maxAge } : {})
+})
+
 const setAccessTokenCookie = (res, token) => {
-  res.cookie(ACCESS_TOKEN_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: env.nodeEnv === 'production',
-    maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS
-  })
+  res.cookie(
+    ACCESS_TOKEN_COOKIE_NAME,
+    token,
+    getCookieOptions(ACCESS_TOKEN_COOKIE_MAX_AGE_MS)
+  )
 }
 
 const setRefreshTokenCookie = (res, token) => {
-  res.cookie(REFRESH_TOKEN_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: env.nodeEnv === 'production',
-    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE_MS
-  })
+  res.cookie(
+    REFRESH_TOKEN_COOKIE_NAME,
+    token,
+    getCookieOptions(REFRESH_TOKEN_COOKIE_MAX_AGE_MS)
+  )
 }
 
 const setAuthCookies = (res, { accessToken, refreshToken }) => {
@@ -62,17 +67,9 @@ const setAuthCookies = (res, { accessToken, refreshToken }) => {
 }
 
 const clearAuthCookies = res => {
-  res.clearCookie(ACCESS_TOKEN_COOKIE_NAME, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: env.nodeEnv === 'production'
-  })
+  res.clearCookie(ACCESS_TOKEN_COOKIE_NAME, getCookieOptions())
 
-  res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: env.nodeEnv === 'production'
-  })
+  res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, getCookieOptions())
 }
 
 const buildUserResponse = user => ({
