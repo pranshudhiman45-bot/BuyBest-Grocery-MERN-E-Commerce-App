@@ -38,7 +38,7 @@ module.exports = {
   frontendUrl:
     process.env.FRONTEND_URL ||
     corsOrigins[0] ||
-    'http://localhost:5173',
+    'buy-best-grocery-mern-e-commerce-a5jixtua0.vercel.app',
   mongoUri: process.env.MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
   accessTokenSecret,
