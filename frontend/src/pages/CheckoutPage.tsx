@@ -19,7 +19,11 @@ import {
   isCouponEligible,
   type CouponDefinition,
 } from "@/lib/offers"
-import { fetchCoupons } from "@/lib/store-api"
+import {
+  createStripeCheckoutSession,
+  fetchCoupons,
+  fetchStripeCheckoutStatus,
+} from "@/lib/store-api"
 import { formatPrice } from "@/lib/storefront"
 import { appShellActions, useAppShellDispatch } from "@/store/app-shell"
 
@@ -39,8 +43,8 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     cartSummary,
     checkoutCart,
     isCartLoading,
+    refreshCart,
   } = useStore()
-
   const cartTotalBeforeDiscount = cartSummary.total
   const appliedCoupon = useMemo(
     () =>
@@ -56,12 +60,14 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
 
   const {
     checkoutMessage,
+    setCheckoutMessage,
     handleCheckout,
     isCheckingOut,
     selectedPaymentMethod,
     setSelectedPaymentMethod,
   } = useCartCheckout({
     checkoutCart,
+    createOnlineCheckoutSession: createStripeCheckoutSession,
     onBeforeCheckout: () => {
       if (currentUser) {
         return true
@@ -80,6 +86,45 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
       return `${response.message} Total payable: ${payableLabel}`
     },
   })
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const stripeStatus = url.searchParams.get("stripe")
+    const sessionId = url.searchParams.get("session_id")
+
+    if (stripeStatus === "cancelled") {
+      setCheckoutMessage("Stripe checkout was cancelled. Your cart is still waiting for you.")
+      window.history.replaceState({}, "", "/checkout")
+      return
+    }
+
+    if (stripeStatus !== "success" || !sessionId || !currentUser) {
+      return
+    }
+
+    const verifyStripeCheckout = async () => {
+      try {
+        const status = await fetchStripeCheckoutStatus(sessionId)
+
+        if (status.paymentStatus === "paid") {
+          await refreshCart()
+          setCheckoutMessage("Payment confirmed and your order has been placed successfully.")
+        } else {
+          setCheckoutMessage("Stripe returned you to checkout, but payment is still processing.")
+        }
+      } catch (error) {
+        setCheckoutMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to verify your Stripe payment right now."
+        )
+      } finally {
+        window.history.replaceState({}, "", "/checkout")
+      }
+    }
+
+    void verifyStripeCheckout()
+  }, [currentUser, refreshCart, setCheckoutMessage])
 
   useEffect(() => {
     const loadCoupons = async () => {
@@ -197,6 +242,22 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     )
   }
 
+  if (cartItems.length === 0 && checkoutMessage) {
+    return (
+      <div className="mx-auto max-w-4xl rounded-[30px] bg-white/80 p-6 text-center shadow-sm sm:p-8">
+        <h1 className="text-2xl font-bold text-[#123c31] sm:text-3xl">Order update</h1>
+        <p className="mt-3 text-[#648176]">{checkoutMessage}</p>
+        <Button
+          type="button"
+          className="mt-6 rounded-2xl bg-[#0d7a45] hover:bg-[#0a6539]"
+          onClick={() => dispatch(appShellActions.openShop())}
+        >
+          Continue shopping
+        </Button>
+      </div>
+    )
+  }
+
   if (cartItems.length === 0) {
     return (
       <div className="mx-auto max-w-4xl rounded-[30px] bg-white/75 p-6 text-center shadow-sm sm:p-8">
@@ -264,7 +325,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
             </div>
           </section>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(380px,1.1fr)]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)] xl:grid-cols-[minmax(0,0.9fr)_minmax(380px,1.1fr)]">
             <div className="space-y-5">
               <PaymentMethodSelector
                 selectedPaymentMethod={selectedPaymentMethod}
@@ -284,7 +345,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
               />
             </div>
 
-            <aside className="xl:sticky xl:top-24 xl:self-start">
+            <aside className="lg:sticky lg:top-24 lg:self-start">
               <OrderSummaryCard
                 cartSummary={cartSummary}
                 cartItems={cartItems}
@@ -295,7 +356,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
                 payableTotal={payableTotal}
                 checkoutLabel="Place Order"
                 showItemDetails={false}
-                onCheckout={handleCheckout}
+                onCheckout={() => handleCheckout(appliedCoupon?.code)}
               />
             </aside>
           </div>

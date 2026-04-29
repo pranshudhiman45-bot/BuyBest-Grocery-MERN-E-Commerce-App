@@ -181,19 +181,19 @@ export function CartLineItemCard({
         </div>
 
         <div className="flex flex-col justify-between gap-3 border-t border-[#f0e6d7] pt-3 sm:col-span-2 lg:col-span-1 lg:min-w-[144px] lg:border-l lg:border-t-0 lg:border-[#f0e6d7] lg:pl-4 lg:pt-0">
-          <div className="space-y-1.5 lg:text-right">
+          <div className="space-y-1.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7b9489]">
               Line Total
             </p>
-            <div className="text-2xl font-semibold leading-none text-[#2c2417]">
+            <div className="break-words text-2xl font-semibold leading-none text-[#2c2417] lg:text-right">
               {formatPrice(item.totalPrice)}
             </div>
-            <div className="text-xs text-[#8f8168] sm:text-sm">
+            <div className="text-xs text-[#8f8168] sm:text-sm lg:text-right">
               {formatPrice(item.price)} each
             </div>
 
             {extendedItem.originalPrice && extendedItem.originalPrice > item.price ? (
-              <div className="text-xs font-semibold text-[#a78410]">
+              <div className="text-xs font-semibold text-[#a78410] lg:text-right">
                 Saved {formatPrice((extendedItem.originalPrice - item.price) * localQty)}
               </div>
             ) : null}

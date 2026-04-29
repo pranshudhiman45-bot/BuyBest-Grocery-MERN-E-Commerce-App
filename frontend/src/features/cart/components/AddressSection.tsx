@@ -225,10 +225,17 @@ export function AddressSection({
             const isSelected = address.id === selectedAddressId
 
             return (
-              <button
+              <div
                 key={address.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => void handleSelectAddress(address.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    void handleSelectAddress(address.id)
+                  }
+                }}
                 className={`rounded-[18px] border p-4 text-left transition ${
                   isSelected
                     ? "border-[#1B4D3E] bg-[#f2faf6] shadow-sm"
@@ -236,19 +243,19 @@ export function AddressSection({
                 }`}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[#2c2417]">
                       <MapPin className="h-4 w-4 text-[#a78410]" />
-                      <span>{address.addressLine}</span>
+                      <span className="break-words">{address.addressLine}</span>
                     </div>
-                    <p className="text-sm leading-6 text-[#6f6148]">
+                    <p className="break-words text-sm leading-6 text-[#6f6148]">
                       {[address.street, address.city, address.state, address.postalCode, address.country]
                         .filter(Boolean)
                         .join(", ")}
                     </p>
-                    <p className="text-sm text-[#6f6148]">Phone: {address.mobile}</p>
+                    <p className="break-all text-sm text-[#6f6148]">Phone: {address.mobile}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     {address.isDefault ? (
                       <span className="rounded-full bg-[#e3f3ea] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#1B4D3E]">
                         Default
@@ -289,7 +296,7 @@ export function AddressSection({
                     </span>
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
@@ -308,7 +315,7 @@ export function AddressSection({
         </div>
 
         {editingAddressId ? (
-          <div className="mt-3 flex items-center justify-between rounded-[16px] border border-[#eadfca] bg-white px-4 py-3 text-sm text-[#6f6148]">
+          <div className="mt-3 flex flex-col gap-3 rounded-[16px] border border-[#eadfca] bg-white px-4 py-3 text-sm text-[#6f6148] sm:flex-row sm:items-center sm:justify-between">
             <span>You are editing an existing address.</span>
             <button
               type="button"
@@ -408,7 +415,7 @@ export function AddressSection({
           type="button"
           onClick={() => void handleCreateOrUpdateAddress()}
           disabled={isSubmitting}
-          className="mt-4 rounded-2xl bg-[#1B4D3E] hover:bg-[#163d32]"
+          className="mt-4 w-full rounded-2xl bg-[#1B4D3E] hover:bg-[#163d32] sm:w-auto"
         >
           {isSubmitting
             ? editingAddressId

@@ -58,6 +58,13 @@ const navButtonClass = (isActive: boolean) =>
       : "text-[#7d6d52] hover:bg-[#faf4e8] hover:text-[#1B4D3E]"
   }`
 
+const mobileNavButtonClass = (isActive: boolean) =>
+  `rounded-full border px-3 py-2 text-xs font-semibold transition ${
+    isActive
+      ? "border-[#f2d58a] bg-[#fff3d0] text-[#624c11]"
+      : "border-[#ece4d6] bg-white text-[#7d6d52] hover:bg-[#faf4e8] hover:text-[#1B4D3E]"
+  }`
+
 const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarProps) => {
   const dispatch = useAppShellDispatch()
   const activeView = useAppShellSelector((state) => state.activeView)
@@ -73,9 +80,22 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
   const [loading, setLoading] = useState(false)
   const [locationName, setLocationName] = useState("Detect Location")
   const [isLocating, setIsLocating] = useState(false)
+  const [locationAlert, setLocationAlert] = useState("")
   const [isLogoutAlertOpen, setIsLogoutAlertOpen] = useState(false)
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!locationAlert) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setLocationAlert("")
+    }, 3200)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [locationAlert])
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(value), 300)
@@ -196,14 +216,17 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
       return
     }
 
-    await onLogout()
-    setIsLogoutAlertOpen(false)
+    try {
+      await onLogout()
+    } finally {
+      setIsLogoutAlertOpen(false)
+    }
   }
 
   return (
     <>
       <nav className="sticky top-0 z-40 border-b border-[#ece4d6] bg-[linear-gradient(180deg,rgba(255,252,246,0.96)_0%,rgba(250,247,241,0.94)_100%)] backdrop-blur">
-        <div className="mx-auto flex h-15 w-full max-w-[1380px] items-center justify-between gap-3 px-3 md:px-5">
+        <div className="mx-auto flex min-h-15 w-full max-w-[1380px] flex-wrap items-center justify-between gap-3 px-3 py-2 md:px-5 md:py-0">
           <div className="flex min-w-0 items-center gap-4 md:gap-6">
             <button
               type="button"
@@ -212,7 +235,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             >
               <img
                 src={Logo}
-                alt="Tapree Logo"
+                alt="Buy Best Logo"
                 className="h-9 w-auto object-contain"
               />
             </button>
@@ -364,11 +387,12 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
               title="Delivery location"
               onClick={() => {
                 if (!navigator.geolocation) {
-                  alert("Geolocation is not supported by your browser")
+                  setLocationAlert("Geolocation is not supported by your browser.")
                   return
                 }
 
                 setIsLocating(true)
+                setLocationAlert("")
                 setLocationName("Detecting...")
 
                 navigator.geolocation.getCurrentPosition(
@@ -395,7 +419,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                     }
                   },
                   () => {
-                    alert("Permission denied. Please allow location access.")
+                    setLocationAlert("Permission denied. Please allow location access.")
                     setLocationName("Select Location")
                     setIsLocating(false)
                   }
@@ -423,7 +447,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             {!user ? (
               <Button
                 variant="default"
-                className="rounded-full bg-[#1B4D3E] px-4 text-white hover:bg-[#163d32]"
+                className="rounded-full bg-[#1B4D3E] px-3 text-white hover:bg-[#163d32] sm:px-4"
                 onClick={() => dispatch(appShellActions.openLogin(undefined))}
               >
                 Login
@@ -468,8 +492,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                     </DropdownMenuItem>
                   ) : null}
                   <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
+                    onSelect={() => {
                       setIsProfileSheetOpen(true)
                     }}
                   >
@@ -478,8 +501,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
-                    onSelect={(event) => {
-                      event.preventDefault()
+                    onSelect={() => {
                       if (!isLoggingOut) {
                         setIsLogoutAlertOpen(true)
                       }
@@ -490,6 +512,136 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+          </div>
+        </div>
+
+        <div className="border-t border-[#efe5d6] px-3 pb-3 pt-2 lg:hidden">
+          <div className="mx-auto flex max-w-[1380px] flex-wrap gap-2">
+            {user?.role !== "support" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => dispatch(appShellActions.openShop(undefined))}
+                  className={mobileNavButtonClass(activeView === "shop" || activeView === "product")}
+                >
+                  Shop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dispatch(appShellActions.openOffers())}
+                  className={mobileNavButtonClass(activeView === "offers")}
+                >
+                  Offers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dispatch(appShellActions.openCart())}
+                  className={mobileNavButtonClass(activeView === "cart" || activeView === "checkout")}
+                >
+                  Cart
+                </button>
+              </>
+            ) : null}
+            {user && user.role !== "support" ? (
+              <button
+                type="button"
+                onClick={() => dispatch(appShellActions.openSupport())}
+                className={mobileNavButtonClass(activeView === "support")}
+              >
+                Support
+              </button>
+            ) : null}
+            {user?.role === "admin" ? (
+              <button
+                type="button"
+                onClick={() => dispatch(appShellActions.openAdmin())}
+                className={mobileNavButtonClass(activeView === "admin")}
+              >
+                Admin
+              </button>
+            ) : null}
+            {user?.role === "support" ? (
+              <button
+                type="button"
+                onClick={() => dispatch(appShellActions.openSupportPanel())}
+                className={mobileNavButtonClass(activeView === "support-panel")}
+              >
+                Dashboard
+              </button>
+            ) : null}
+          </div>
+
+          <div ref={containerRef} className="relative mt-3 md:hidden">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a8d74]" />
+            <Input
+              type="search"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown") {
+                  setActiveIndex((prev) => Math.min(prev + 1, filtered.length - 1))
+                } else if (event.key === "ArrowUp") {
+                  setActiveIndex((prev) => Math.max(prev - 1, 0))
+                } else if (event.key === "Enter" && activeIndex >= 0) {
+                  event.preventDefault()
+                  const item = filtered[activeIndex]
+                  if (item) {
+                    handleSelectProduct(item)
+                  }
+                }
+              }}
+              className="h-10 w-full rounded-full border-[#e6dcc9] bg-white pl-10 text-sm text-[#2c2417] shadow-sm ring-0 focus-visible:ring-1 focus-visible:ring-[#c8aa45]"
+            />
+
+            {!value ? (
+              <div className="pointer-events-none absolute left-10 top-1/2 h-5 -translate-y-1/2 overflow-hidden text-sm text-[#a3967d]">
+                <div key={`mobile-${index}`} className="transform transition-all duration-700 ease-in-out">
+                  <span>
+                    {SEARCH_PLACEHOLDERS[index].text}
+                    <span className="font-medium text-[#a78410]">
+                      {typed}
+                      <span className={`${showCursor ? "opacity-100" : "opacity-0"} ml-0.5`}>
+                        |
+                      </span>
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            {(loading || filtered.length > 0 || (value && !loading && filtered.length === 0)) && (
+              <div className="absolute top-full z-30 mt-2 w-full rounded-2xl border border-[#ece4d6] bg-white shadow-[0_16px_34px_rgba(78,62,31,0.10)]">
+                {loading ? (
+                  <div className="flex items-center gap-2 p-4 text-sm text-[#7d6d52]">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#d9ccb1] border-t-[#a78410]" />
+                    Searching...
+                  </div>
+                ) : filtered.length > 0 ? (
+                  <ul className="py-2 text-sm">
+                    {filtered.map((item, itemIndex) => (
+                      <li
+                        key={item.id}
+                        className={`flex cursor-pointer items-center gap-2 px-4 py-2 transition ${
+                          itemIndex === activeIndex ? "bg-[#faf4e8]" : "hover:bg-[#fcf8ef]"
+                        }`}
+                        onMouseEnter={() => setActiveIndex(itemIndex)}
+                        onClick={() => handleSelectProduct(item)}
+                      >
+                        <Search className="h-3 w-3 text-[#af9d7c]" />
+                        <span className="flex flex-col">
+                          <span>{item.name}</span>
+                          <span className="text-xs text-[#8f8168]">
+                            {item.categoryLabel} · {item.size}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-4 text-sm text-[#8f8168]">No results found</div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -550,6 +702,16 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
               </div>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {locationAlert ? (
+        <div className="fixed right-4 top-20 z-50 w-[calc(100vw-2rem)] max-w-sm sm:right-6">
+          <Alert variant="destructive" className="border-[#f1d0d0] bg-white shadow-[0_18px_44px_rgba(44,36,23,0.12)]">
+            <TriangleAlert className="h-4 w-4" />
+            <AlertTitle>Location unavailable</AlertTitle>
+            <AlertDescription>{locationAlert}</AlertDescription>
+          </Alert>
         </div>
       ) : null}
 

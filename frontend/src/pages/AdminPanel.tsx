@@ -1,5 +1,7 @@
 import * as React from "react";
 import {
+  CircleAlert,
+  CircleCheckBig,
   Boxes,
   FolderTree,
   Pencil,
@@ -9,6 +11,7 @@ import {
   Sparkles,
   Star,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -36,12 +39,14 @@ import {
   deleteCatagory,
   deleteProduct,
   fetchAdminCoupons,
+  fetchAppSettings,
   fetchCatagories,
   fetchInventoryAlerts,
   fetchProducts,
   uploadProductImage,
   updateCatagory,
   updateCoupon,
+  updateAppSettings,
   updateProduct,
   type CategoryFormData,
   type InventoryAlertsResponse,
@@ -229,9 +234,13 @@ export default function AdminPanel() {
   const [isCategorySaving, setIsCategorySaving] = React.useState(false);
   const [isCouponSaving, setIsCouponSaving] = React.useState(false);
   const [isImageUploading, setIsImageUploading] = React.useState(false);
+  const [selectedImageNames, setSelectedImageNames] = React.useState<string[]>(
+    [],
+  );
   const [message, setMessage] = React.useState("");
   const [error, setError] = React.useState("");
   // Collapsible products workspace state
+  const [showInventoryAlerts, setShowInventoryAlerts] = React.useState(false);
   const [showProducts, setShowProducts] = React.useState(false);
   const [showCategories, setShowCategories] = React.useState(false);
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>([]);
@@ -239,8 +248,15 @@ export default function AdminPanel() {
     null,
   );
   const [isBulkConfirm, setIsBulkConfirm] = React.useState(false);
-  const [showCouponForm, setShowCouponForm] = React.useState(true);
-  const [showProductForm, setShowProductForm] = React.useState(true);
+  const [confirmCouponDeleteId, setConfirmCouponDeleteId] = React.useState<
+    string | null
+  >(null);
+  const [confirmCategoryDeleteId, setConfirmCategoryDeleteId] =
+    React.useState<string | null>(null);
+  const [showCouponForm, setShowCouponForm] = React.useState(false);
+  const [showProductForm, setShowProductForm] = React.useState(false);
+  const [taxPercentage, setTaxPercentage] = React.useState("5");
+  const [isSettingsSaving, setIsSettingsSaving] = React.useState(false);
 
   const toggleProductSelection = (id: string) => {
     setSelectedProducts((prev) =>
@@ -248,14 +264,28 @@ export default function AdminPanel() {
     );
   };
 
+  React.useEffect(() => {
+    if (!message && !error) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMessage("");
+      setError("");
+    }, 3200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [message, error]);
+
   const loadAdminData = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const [productsResult, categoriesResult, alertsResult, couponsResult] = await Promise.allSettled([
+      const [productsResult, categoriesResult, alertsResult, couponsResult, settingsResult] = await Promise.allSettled([
         fetchProducts(),
         fetchCatagories(),
         fetchInventoryAlerts(),
         fetchAdminCoupons(),
+        fetchAppSettings(),
       ]);
 
       if (productsResult.status === "fulfilled") {
@@ -291,6 +321,10 @@ export default function AdminPanel() {
 
       if (couponsResult.status === "fulfilled") {
         setCoupons(couponsResult.value);
+      }
+
+      if (settingsResult.status === "fulfilled") {
+        setTaxPercentage(String(settingsResult.value.taxPercentage));
       }
 
       const criticalLoadFailed =
@@ -498,7 +532,7 @@ export default function AdminPanel() {
     setEditingId(product.id);
     setMessage("");
     setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setShowProductForm(true);
   };
 
   const handleCategoryEdit = (category: Category) => {
@@ -509,7 +543,6 @@ export default function AdminPanel() {
     setEditingCategoryId(category.mongoId || null);
     setMessage("");
     setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCouponEdit = (coupon: CouponDefinition) => {
@@ -517,7 +550,6 @@ export default function AdminPanel() {
     setEditingCouponId(coupon.id);
     setMessage("");
     setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCategorySelect = (
@@ -540,9 +572,11 @@ export default function AdminPanel() {
     const files = Array.from(event.target.files || []);
 
     if (files.length === 0) {
+      setSelectedImageNames([]);
       return;
     }
 
+    setSelectedImageNames(files.map((file) => file.name));
     setIsImageUploading(true);
     setMessage("");
     setError("");
@@ -575,6 +609,7 @@ export default function AdminPanel() {
       );
     } finally {
       event.target.value = "";
+      setSelectedImageNames([]);
       setIsImageUploading(false);
     }
   };
@@ -668,9 +703,33 @@ export default function AdminPanel() {
   };
 
   const handleCouponDelete = async (couponId: string) => {
-    const confirmed = window.confirm("Remove this coupon from the store?");
+    setConfirmCouponDeleteId(couponId);
+  };
 
-    if (!confirmed) {
+  const handleSettingsSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSettingsSaving(true);
+    setError("");
+
+    try {
+      const response = await updateAppSettings({
+        taxPercentage: Number(taxPercentage),
+      });
+      setTaxPercentage(String(response.settings.taxPercentage));
+      setMessage(response.message);
+    } catch (settingsError) {
+      setError(
+        settingsError instanceof Error
+          ? settingsError.message
+          : "Unable to update store settings.",
+      );
+    } finally {
+      setIsSettingsSaving(false);
+    }
+  };
+
+  const confirmCouponDeleteAction = async () => {
+    if (!confirmCouponDeleteId) {
       return;
     }
 
@@ -678,10 +737,10 @@ export default function AdminPanel() {
     setError("");
 
     try {
-      const response = await deleteCoupon(couponId);
+      const response = await deleteCoupon(confirmCouponDeleteId);
       setMessage(response.message);
 
-      if (editingCouponId === couponId) {
+      if (editingCouponId === confirmCouponDeleteId) {
         resetCouponForm();
       }
 
@@ -692,6 +751,8 @@ export default function AdminPanel() {
           ? deleteError.message
           : "Unable to delete coupon.",
       );
+    } finally {
+      setConfirmCouponDeleteId(null);
     }
   };
 
@@ -737,9 +798,11 @@ export default function AdminPanel() {
   };
 
   const handleCategoryDelete = async (catagoryId: string) => {
-    const confirmed = window.confirm("Remove this category from the store?");
+    setConfirmCategoryDeleteId(catagoryId);
+  };
 
-    if (!confirmed) {
+  const confirmCategoryDeleteAction = async () => {
+    if (!confirmCategoryDeleteId) {
       return;
     }
 
@@ -747,10 +810,10 @@ export default function AdminPanel() {
     setMessage("");
 
     try {
-      const response = await deleteCatagory(catagoryId);
+      const response = await deleteCatagory(confirmCategoryDeleteId);
       setMessage(response.message);
 
-      if (editingCategoryId === catagoryId) {
+      if (editingCategoryId === confirmCategoryDeleteId) {
         resetCategoryForm();
       }
 
@@ -761,6 +824,8 @@ export default function AdminPanel() {
           ? deleteError.message
           : "Unable to delete category.",
       );
+    } finally {
+      setConfirmCategoryDeleteId(null);
     }
   };
 
@@ -859,30 +924,123 @@ export default function AdminPanel() {
         </CardHeader>
       </Card>
 
-      {message ? (
-        <Alert>
-          <AlertTitle>Saved</AlertTitle>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
+      {message || error ? (
+        <div className="pointer-events-none fixed right-4 top-4 z-50 w-[calc(100vw-2rem)] max-w-md sm:right-6 sm:top-6">
+          <div
+            className={`pointer-events-auto overflow-hidden rounded-[24px] border px-5 py-4 shadow-[0_22px_60px_rgba(16,57,47,0.18)] backdrop-blur ${
+              error
+                ? "border-[#f3c2c2] bg-[#fff6f6]/95 text-[#7a2727]"
+                : "border-[#cfe7d7] bg-white/95 text-[#123b30]"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full ${
+                  error ? "bg-[#ffe3e3]" : "bg-[#edf8f1]"
+                }`}
+              >
+                {error ? (
+                  <CircleAlert className="size-5 text-[#c24b4b]" />
+                ) : (
+                  <CircleCheckBig className="size-5 text-[#0d7a45]" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">
+                  {error ? "Action failed" : "Action completed"}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-inherit/80">
+                  {error || message}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMessage("");
+                  setError("");
+                }}
+                className="rounded-full p-1 text-[#6f897e] transition hover:bg-black/5 hover:text-[#123b30]"
+                aria-label="Close notification"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Something went wrong</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
+      <Card className="rounded-[28px] border border-white/70 bg-white/92 py-0 shadow-[0_18px_44px_rgba(18,75,53,0.08)]">
+        <CardHeader className="px-6 pt-6">
+          <CardTitle>Store settings</CardTitle>
+          <CardDescription>
+            Update the shared tax percentage used in cart summaries and checkout totals.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-6 pb-6">
+          <form
+            onSubmit={handleSettingsSubmit}
+            className="grid gap-4 md:grid-cols-[minmax(0,280px)_auto] md:items-end"
+          >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="store-tax-percentage">Tax percentage</FieldLabel>
+                <Input
+                  id="store-tax-percentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={taxPercentage}
+                  onChange={(event) => setTaxPercentage(event.target.value)}
+                  required
+                />
+                <FieldDescription>
+                  Example: enter `5` for 5% tax.
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <Card className="rounded-[28px] border border-white/70 bg-white/92 py-0 shadow-[0_18px_44px_rgba(18,75,53,0.08)]">
+            <div className="flex items-center gap-3">
+              <Button
+                type="submit"
+                disabled={isSettingsSaving}
+                className="rounded-2xl bg-[#0d7a45] text-white hover:bg-[#0a6539]"
+              >
+                {isSettingsSaving ? "Saving..." : "Save tax settings"}
+              </Button>
+              <span className="text-sm text-[#6f897e]">
+                Current applied tax: {taxPercentage || "0"}%
+              </span>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <Card className="self-start rounded-[28px] border border-white/70 bg-white/92 py-0 shadow-[0_18px_44px_rgba(18,75,53,0.08)]">
           <CardHeader className="px-6 pt-6">
-            <CardTitle>Inventory alerts</CardTitle>
-            <CardDescription>
-              Products with 5 or fewer units in stock, out-of-stock items, or expiry dates within 30 days.
-            </CardDescription>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Inventory alerts</CardTitle>
+                <CardDescription>
+                  Products with 5 or fewer units in stock, out-of-stock items, or expiry dates within 30 days.
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowInventoryAlerts((prev) => !prev)}
+                className="rounded-xl px-3 py-1.5 text-xs"
+              >
+                {showInventoryAlerts ? "Hide" : "Show"}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="grid gap-5 px-6 pb-6 md:grid-cols-3">
-            <div className="space-y-3 rounded-[24px] border border-[#efe4c7] bg-[#fff8e8] p-5">
+          {showInventoryAlerts ? (
+          <CardContent className="grid items-start gap-5 px-6 pb-6 md:grid-cols-3">
+            <div className="self-start rounded-[24px] border border-[#efe4c7] bg-[#fff8e8] p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8e6b16]">
@@ -894,8 +1052,8 @@ export default function AdminPanel() {
                 </div>
                 <Boxes className="size-8 text-[#c28d18]" />
               </div>
-              <div className="space-y-2">
-                {inventoryAlerts.alerts.lowStockProducts.slice(0, 5).map((product) => (
+              <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                {inventoryAlerts.alerts.lowStockProducts.map((product) => (
                   <div
                     key={product.id}
                     className="rounded-[18px] bg-white/80 px-4 py-3 text-sm text-[#5f4b18]"
@@ -910,9 +1068,14 @@ export default function AdminPanel() {
                   <p className="text-sm text-[#7f6a37]">No low-stock products right now.</p>
                 ) : null}
               </div>
+              {inventoryAlerts.alerts.lowStockProducts.length > 5 ? (
+                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9b7a28]">
+                  Scroll to view all items
+                </p>
+              ) : null}
             </div>
 
-            <div className="space-y-3 rounded-[24px] border border-[#f0d9d9] bg-[#fff5f5] p-5">
+            <div className="self-start rounded-[24px] border border-[#f0d9d9] bg-[#fff5f5] p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a3f3f]">
@@ -924,8 +1087,8 @@ export default function AdminPanel() {
                 </div>
                 <Boxes className="size-8 text-[#c65a5a]" />
               </div>
-              <div className="space-y-2">
-                {inventoryAlerts.alerts.outOfStockProducts.slice(0, 5).map((product) => (
+              <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                {inventoryAlerts.alerts.outOfStockProducts.map((product) => (
                   <div
                     key={product.id}
                     className="rounded-[18px] bg-white/90 px-4 py-3 text-sm text-[#6b2d2d]"
@@ -940,9 +1103,14 @@ export default function AdminPanel() {
                   <p className="text-sm text-[#8f5959]">No out-of-stock products right now.</p>
                 ) : null}
               </div>
+              {inventoryAlerts.alerts.outOfStockProducts.length > 5 ? (
+                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b05d5d]">
+                  Scroll to view all items
+                </p>
+              ) : null}
             </div>
 
-            <div className="space-y-3 rounded-[24px] border border-[#d8e8dc] bg-[#f4fbf6] p-5">
+            <div className="self-start rounded-[24px] border border-[#d8e8dc] bg-[#f4fbf6] p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#2f6a45]">
@@ -954,8 +1122,8 @@ export default function AdminPanel() {
                 </div>
                 <Sparkles className="size-8 text-[#2f8b5c]" />
               </div>
-              <div className="space-y-2">
-                {inventoryAlerts.alerts.expiringSoonProducts.slice(0, 5).map((product) => (
+              <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                {inventoryAlerts.alerts.expiringSoonProducts.map((product) => (
                   <div
                     key={product.id}
                     className="rounded-[18px] bg-white px-4 py-3 text-sm text-[#2f5c4a]"
@@ -970,11 +1138,17 @@ export default function AdminPanel() {
                   <p className="text-sm text-[#62806f]">No products expiring within 30 days.</p>
                 ) : null}
               </div>
+              {inventoryAlerts.alerts.expiringSoonProducts.length > 5 ? (
+                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5b8a74]">
+                  Scroll to view all items
+                </p>
+              ) : null}
             </div>
           </CardContent>
+          ) : null}
         </Card>
 
-        <Card className="rounded-[28px] border border-white/70 bg-white/92 py-0 shadow-[0_18px_44px_rgba(18,75,53,0.08)]">
+        <Card className="self-start rounded-[28px] border border-white/70 bg-white/92 py-0 shadow-[0_18px_44px_rgba(18,75,53,0.08)]">
           <CardHeader className="px-6 pt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1006,7 +1180,7 @@ export default function AdminPanel() {
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    alert("Bank offers section coming next 🚀")
+                    setMessage("Bank offers section coming next.");
                   }}
                   className="rounded-2xl border-[#dbeadf] hover:bg-[#f0f7f3]"
                 >
@@ -1015,8 +1189,8 @@ export default function AdminPanel() {
               </div>
             </div>
           </CardHeader>
+          {showCouponForm ? (
           <CardContent className="grid gap-6 px-6 pb-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            {showCouponForm && (
             <form onSubmit={handleCouponSubmit} className="space-y-4">
               <FieldGroup>
                 <Field>
@@ -1103,36 +1277,64 @@ export default function AdminPanel() {
                 </Button>
               </FieldGroup>
             </form>
-            )}
 
-            <div className="space-y-3">
-              {coupons.map((coupon) => (
-                <div
-                  key={coupon.id}
-                  className="rounded-[22px] border border-[#e3efe8] bg-[#fbfdfc] p-4"
+            <div>
+              {confirmCouponDeleteId ? (
+                <Alert
+                  variant="destructive"
+                  className="mb-4 flex items-center justify-between"
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ProductBadge
-                          label={coupon.isActive === false ? "inactive" : "active"}
-                          tone={coupon.isActive === false ? "gray" : "green"}
-                        />
-                        <span className="text-sm font-semibold text-[#123b30]">{coupon.code}</span>
-                        <span className="text-sm text-[#5b756b]">{formatCouponDiscount(coupon)}</span>
-                      </div>
-                      <p className="mt-2 text-sm text-[#5f7b70]">{coupon.description}</p>
-                      <p className="mt-2 text-xs uppercase tracking-[0.14em] text-[#7d958b]">
-                        Minimum order {formatPrice(coupon.minimumOrderValue)}
-                      </p>
-                      {coupon.maxDiscount && coupon.discountType === "percentage" && (
-                        <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[#7d958b]">
-                          Max discount {formatPrice(coupon.maxDiscount)}
+                  <div>
+                    <AlertTitle>Delete this coupon?</AlertTitle>
+                    <AlertDescription>
+                      This action cannot be undone.
+                    </AlertDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setConfirmCouponDeleteId(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => void confirmCouponDeleteAction()}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </Alert>
+              ) : null}
+              <div className="max-h-[540px] space-y-3 overflow-y-auto pr-1">
+                {coupons.map((coupon) => (
+                  <div
+                    key={coupon.id}
+                    className="rounded-[22px] border border-[#e3efe8] bg-[#fbfdfc] p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ProductBadge
+                            label={coupon.isActive === false ? "inactive" : "active"}
+                            tone={coupon.isActive === false ? "gray" : "green"}
+                          />
+                          <span className="text-sm font-semibold text-[#123b30]">{coupon.code}</span>
+                          <span className="text-sm text-[#5b756b]">{formatCouponDiscount(coupon)}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-[#5f7b70]">{coupon.description}</p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.14em] text-[#7d958b]">
+                          Minimum order {formatPrice(coupon.minimumOrderValue)}
                         </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 mt-2 sm:mt-0 sm:ml-auto">
-                      {showCouponForm && (
+                        {coupon.maxDiscount && coupon.discountType === "percentage" && (
+                          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[#7d958b]">
+                            Max discount {formatPrice(coupon.maxDiscount)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="mt-2 flex gap-2 sm:mt-0 sm:ml-auto">
                         <Button
                           type="button"
                           variant="outline"
@@ -1141,26 +1343,94 @@ export default function AdminPanel() {
                         >
                           Edit
                         </Button>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="rounded-2xl whitespace-nowrap px-3 py-1.5 text-xs text-[#b85a5a] hover:bg-[#ffeaea] hover:text-[#943f3f]"
-                        onClick={() => handleCouponDelete(coupon.id)}
-                      >
-                        Delete
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="rounded-2xl whitespace-nowrap px-3 py-1.5 text-xs text-[#b85a5a] hover:bg-[#ffeaea] hover:text-[#943f3f]"
+                          onClick={() => handleCouponDelete(coupon.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              {coupons.length === 0 ? (
-                <p className="rounded-[18px] border border-dashed border-[#dbeadf] px-4 py-5 text-sm text-[#648176]">
-                  No coupons created yet.
+                ))}
+                {coupons.length === 0 ? (
+                  <p className="rounded-[18px] border border-dashed border-[#dbeadf] px-4 py-5 text-sm text-[#648176]">
+                    No coupons created yet.
+                  </p>
+                ) : null}
+              </div>
+              {coupons.length > 4 ? (
+                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f897e]">
+                  Scroll to view all coupons
                 </p>
               ) : null}
             </div>
           </CardContent>
+          ) : showInventoryAlerts ? (
+          <CardContent className="px-6 pb-6">
+            {coupons.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-[20px] border border-[#e3efe8] bg-[#f8fcf9] px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6f897e]">
+                      Coupon preview
+                    </p>
+                    <p className="mt-1 text-sm text-[#5f7b70]">
+                      Showing {Math.min(coupons.length, 3)} of {coupons.length} coupons while the editor is hidden.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-[#edf6f1] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#184236]">
+                    {coupons.length} total
+                  </span>
+                </div>
+
+                <div className="grid gap-3">
+                  {coupons.slice(0, 3).map((coupon) => (
+                    <div
+                      key={coupon.id}
+                      className="rounded-[22px] border border-[#e3efe8] bg-[#fbfdfc] p-4"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <ProductBadge
+                              label={coupon.isActive === false ? "inactive" : "active"}
+                              tone={coupon.isActive === false ? "gray" : "green"}
+                            />
+                            <span className="text-sm font-semibold text-[#123b30]">
+                              {coupon.code}
+                            </span>
+                            <span className="text-sm text-[#5b756b]">
+                              {formatCouponDiscount(coupon)}
+                            </span>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-sm text-[#5f7b70]">
+                            {coupon.description || "No description added yet."}
+                          </p>
+                          <p className="mt-2 text-xs uppercase tracking-[0.14em] text-[#7d958b]">
+                            Minimum order {formatPrice(coupon.minimumOrderValue)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {coupons.length > 3 ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#6f897e]">
+                    Open the section to manage the full coupon list.
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-[20px] border border-dashed border-[#dbeadf] bg-[#fbfdfc] px-4 py-6 text-sm text-[#648176]">
+                No coupons created yet. Use the Show button to open the coupon form.
+              </div>
+            )}
+          </CardContent>
+          ) : null}
         </Card>
       </div>
 
@@ -1182,7 +1452,10 @@ export default function AdminPanel() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={resetForm}
+                    onClick={() => {
+                      resetForm();
+                      setShowProductForm(true);
+                    }}
                     className="rounded-2xl border-[#dbeadf] hover:bg-[#f0f7f3] transition px-3 py-2 whitespace-nowrap"
                   >
                     New product
@@ -1424,13 +1697,35 @@ export default function AdminPanel() {
                     <FieldLabel htmlFor="product-image-upload">
                       Upload images from device
                     </FieldLabel>
+                    <label
+                      htmlFor="product-image-upload"
+                      className="group flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-[22px] border border-[#dbe7de] bg-[linear-gradient(135deg,#ffffff_0%,#f7fbf8_100%)] px-4 py-3 shadow-[0_10px_22px_rgba(18,59,48,0.06)] transition hover:border-[#b9d9c7] hover:shadow-[0_14px_28px_rgba(18,59,48,0.08)]"
+                    >
+                      <div className="min-w-0">
+                        <div className="inline-flex rounded-full bg-[#e7f5ec] px-4 py-2 text-sm font-semibold text-[#14543c] transition group-hover:bg-[#d9f2e1]">
+                          {isImageUploading ? "Uploading..." : "Choose files"}
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="truncate text-sm font-medium text-[#24352d] sm:text-base">
+                          {selectedImageNames.length === 0
+                            ? "Select one or more product images"
+                            : selectedImageNames.length === 1
+                              ? selectedImageNames[0]
+                              : `${selectedImageNames.length} files selected`}
+                        </p>
+                        <p className="mt-1 text-xs text-[#6e7d76]">
+                          PNG, JPG, WEBP supported
+                        </p>
+                      </div>
+                    </label>
                     <input
                       id="product-image-upload"
                       type="file"
                       accept="image/*"
                       multiple
                       onChange={handleLocalImageUpload}
-                      className="flex h-11 w-full cursor-pointer rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none file:mr-3 file:rounded-full file:border-0 file:bg-[#e8f7ec] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#14543c] hover:file:bg-[#d9f2e1]"
+                      className="sr-only"
                     />
                     <FieldDescription>
                       Upload from your device and the hosted image URLs will be
@@ -1933,6 +2228,35 @@ export default function AdminPanel() {
             <CardContent className="space-y-4 px-6 pb-6">
               {showCategories && (
                 <>
+                  {confirmCategoryDeleteId ? (
+                    <Alert
+                      variant="destructive"
+                      className="mb-4 flex items-center justify-between"
+                    >
+                      <div>
+                        <AlertTitle>Delete this category?</AlertTitle>
+                        <AlertDescription>
+                          This action cannot be undone.
+                        </AlertDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setConfirmCategoryDeleteId(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={() => void confirmCategoryDeleteAction()}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </Alert>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-3 text-sm text-[#678277]">
                     <span className="rounded-full bg-[#edf6f1] px-4 py-2 font-medium text-[#184236]">
                       {filteredCategories.length} categor

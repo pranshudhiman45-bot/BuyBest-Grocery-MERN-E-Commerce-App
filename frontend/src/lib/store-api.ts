@@ -43,6 +43,19 @@ export type CheckoutResponse = {
   address?: Address | null
   summary: CartSummary
   items: CartItem[]
+  couponCode?: string | null
+  couponDiscount?: number
+}
+
+export type StripeCheckoutSessionResponse = {
+  sessionId: string
+  url: string | null
+}
+
+export type StripeCheckoutStatusResponse = {
+  sessionId: string
+  status: string
+  paymentStatus: string
 }
 
 export type Address = {
@@ -129,6 +142,10 @@ export type BankOffer = {
   id: number
   bank: string
   offer: string
+}
+
+export type AppSettings = {
+  taxPercentage: number
 }
 
 const normalizeInventoryAlertsResponse = (
@@ -397,15 +414,47 @@ export async function removeCartItem(productId: string) {
   }
 }
 
-export async function checkoutCart(paymentMethod: string) {
+export async function checkoutCart(paymentMethod: string, couponCode?: string) {
   try {
     const response = await storeApi.post<CheckoutResponse>("/api/cart/checkout", {
       paymentMethod,
+      couponCode,
     })
 
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to create checkout summary."))
+  }
+}
+
+export async function createStripeCheckoutSession(
+  paymentMethod: string,
+  couponCode?: string
+) {
+  try {
+    const response = await storeApi.post<StripeCheckoutSessionResponse>(
+      "/api/payment/create-checkout-session",
+      {
+        paymentMethod,
+        couponCode,
+      }
+    )
+
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to start Stripe checkout."))
+  }
+}
+
+export async function fetchStripeCheckoutStatus(sessionId: string) {
+  try {
+    const response = await storeApi.get<StripeCheckoutStatusResponse>(
+      `/api/payment/session-status/${encodeURIComponent(sessionId)}`
+    )
+
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to verify Stripe payment status."))
   }
 }
 
@@ -527,5 +576,26 @@ export async function fetchBankOffers() {
     return response.data.offers
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to load bank offers."))
+  }
+}
+
+export async function fetchAppSettings() {
+  try {
+    const response = await storeApi.get<AppSettings>("/api/settings")
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load app settings."))
+  }
+}
+
+export async function updateAppSettings(payload: AppSettings) {
+  try {
+    const response = await storeApi.put<{ message: string; settings: AppSettings }>(
+      "/api/settings",
+      payload
+    )
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to update app settings."))
   }
 }

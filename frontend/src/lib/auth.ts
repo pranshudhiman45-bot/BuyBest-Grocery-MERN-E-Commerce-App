@@ -11,8 +11,6 @@ export type AuthUser = {
 
 export type LoginResponse = {
   user: AuthUser
-  accessToken: string
-  refreshToken: string
 }
 
 export type MessageResponse = {
@@ -38,6 +36,10 @@ export type RegisterResponse = {
 export type VerifyOtpResponse = LoginResponse & {
   message: string
   welcomeEmailSent?: boolean
+}
+
+export type ResetPasswordResponse = LoginResponse & {
+  message: string
 }
 
 export type CurrentUserResponse = {
@@ -114,7 +116,7 @@ export const clearStoredAuthUser = () => {
 export async function refreshSession() {
   if (!refreshRequest) {
     refreshRequest = refreshApi
-      .post<LoginResponse>("/api/auth/refresh-token")
+      .post<CurrentUserResponse>("/api/auth/refresh-token")
       .then(() => undefined)
       .finally(() => {
         refreshRequest = null
@@ -136,6 +138,7 @@ authApi.interceptors.response.use(
     const shouldSkipRefresh =
       requestUrl.includes("/api/auth/login") ||
       requestUrl.includes("/api/auth/forgot-password") ||
+      requestUrl.includes("/api/auth/reset-password") ||
       requestUrl.includes("/api/auth/refresh-token") ||
       requestUrl.includes("/api/auth/logout")
 
@@ -209,6 +212,28 @@ export async function forgotPassword(email: string) {
         error,
         "Unable to process forgot password request."
       )
+    )
+  }
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+  confirmPassword: string
+) {
+  try {
+    const response = await authApi.post<ResetPasswordResponse>(
+      `/api/auth/reset-password/${encodeURIComponent(token)}`,
+      {
+        password,
+        confirmPassword,
+      }
+    )
+
+    return response.data
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error, "Unable to reset your password.")
     )
   }
 }

@@ -14,6 +14,7 @@ import {
 import {
   addCartItem as addCartItemApi,
   checkoutCart as checkoutCartApi,
+  fetchAppSettings,
   fetchCart,
   fetchProductById,
   fetchProducts,
@@ -30,6 +31,7 @@ import type { Product } from "@/lib/storefront"
 const GUEST_CART_STORAGE_KEY = "guest_cart_items"
 const DELIVERY_FEE = 40
 const FREE_DELIVERY_THRESHOLD = 300
+const DEFAULT_TAX_PERCENTAGE = 5
 
 type GuestCartEntry = {
   productId: string
@@ -51,7 +53,7 @@ type StoreContextValue = {
   updateCartQuantity: (productId: string, quantity: number) => Promise<void>
   removeFromCart: (productId: string) => Promise<void>
   searchProducts: (query: string) => Promise<Product[]>
-  checkoutCart: (paymentMethod: string) => Promise<CheckoutResponse>
+  checkoutCart: (paymentMethod: string, couponCode?: string) => Promise<CheckoutResponse>
 }
 
 const emptySummary: CartSummary = {
@@ -113,11 +115,12 @@ const writeGuestCartEntries = (entries: GuestCartEntry[]) => {
   window.localStorage.setItem(GUEST_CART_STORAGE_KEY, JSON.stringify(entries))
 }
 
-const buildGuestSummary = (items: CartItem[]): CartSummary => {
+const buildGuestSummary = (items: CartItem[], taxPercentage: number): CartSummary => {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0)
   const deliveryFee =
     subtotal > 0 && subtotal < FREE_DELIVERY_THRESHOLD ? DELIVERY_FEE : 0
-  const tax = Number((subtotal * 0.05).toFixed(2))
+  const normalizedTaxRate = Math.max(0, Number(taxPercentage) || 0) / 100
+  const tax = Number((subtotal * normalizedTaxRate).toFixed(2))
   const total = subtotal + deliveryFee + tax
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
@@ -130,7 +133,7 @@ const buildGuestSummary = (items: CartItem[]): CartSummary => {
   }
 }
 
-const buildGuestCartState = async (entries: GuestCartEntry[]) => {
+const buildGuestCartState = async (entries: GuestCartEntry[], taxPercentage: number) => {
   if (entries.length === 0) {
     return {
       items: [] as CartItem[],
@@ -188,7 +191,7 @@ const buildGuestCartState = async (entries: GuestCartEntry[]) => {
 
   return {
     items,
-    summary: buildGuestSummary(items),
+    summary: buildGuestSummary(items, taxPercentage),
   }
 }
 
@@ -218,6 +221,7 @@ const getProductLimitErrorMessage = (
 export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [cartSummary, setCartSummary] = useState<CartSummary>(emptySummary)
+  const [taxPercentage, setTaxPercentage] = useState(DEFAULT_TAX_PERCENTAGE)
   const [isCartLoading, setIsCartLoading] = useState(true)
   const [isFreeDeliveryPopupOpen, setIsFreeDeliveryPopupOpen] = useState(false)
   const previousSubtotalRef = useRef(0)
@@ -261,9 +265,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const refreshCart = useCallback(async () => {
     setIsCartLoading(true)
     try {
+      const settings = await fetchAppSettings().catch(() => ({ taxPercentage: DEFAULT_TAX_PERCENTAGE }))
+      setTaxPercentage(settings.taxPercentage)
       const data = currentUser
         ? await fetchCart()
-        : await buildGuestCartState(readGuestCartEntries())
+        : await buildGuestCartState(readGuestCartEntries(), settings.taxPercentage)
       syncCartState(data)
     } finally {
       setIsCartLoading(false)
@@ -329,7 +335,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
 
     writeGuestCartEntries(nextEntries)
-    const guestCartState = await buildGuestCartState(nextEntries)
+    const guestCartState = await buildGuestCartState(nextEntries, taxPercentage)
     syncCartState(guestCartState)
 
     const requestedGuestQuantity = Math.max(
@@ -342,7 +348,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (actualQuantity < requestedGuestQuantity) {
       throw new Error(buildGuestQuantityLimitMessage(cartItem))
     }
-  }, [assertWithinProductLimit, cartItems, currentUser, syncCartState])
+  }, [assertWithinProductLimit, cartItems, currentUser, syncCartState, taxPercentage])
 
   const updateCartQuantity = useCallback(async (productId: string, quantity: number) => {
     await assertWithinProductLimit(productId, quantity)
@@ -370,7 +376,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           : [...currentEntries, { productId, quantity }]
 
     writeGuestCartEntries(nextEntries)
-    const guestCartState = await buildGuestCartState(nextEntries)
+    const guestCartState = await buildGuestCartState(nextEntries, taxPercentage)
     syncCartState(guestCartState)
 
     if (quantity > 0) {
@@ -381,7 +387,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         throw new Error(buildGuestQuantityLimitMessage(cartItem))
       }
     }
-  }, [assertWithinProductLimit, currentUser, syncCartState])
+  }, [assertWithinProductLimit, currentUser, syncCartState, taxPercentage])
 
   const removeFromCart = useCallback(async (productId: string) => {
     if (currentUser) {
@@ -398,13 +404,13 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
     const nextEntries = readGuestCartEntries().filter((entry) => entry.productId !== productId)
     writeGuestCartEntries(nextEntries)
-    syncCartState(await buildGuestCartState(nextEntries))
-  }, [currentUser, syncCartState])
+    syncCartState(await buildGuestCartState(nextEntries, taxPercentage))
+  }, [currentUser, syncCartState, taxPercentage])
 
   const searchProducts = useCallback(async (query: string) => searchProductsApi(query), [])
 
-  const checkoutCart = useCallback(async (paymentMethod: string) => {
-    const response = await checkoutCartApi(paymentMethod)
+  const checkoutCart = useCallback(async (paymentMethod: string, couponCode?: string) => {
+    const response = await checkoutCartApi(paymentMethod, couponCode)
 
     if (currentUser) {
       await refreshCart()

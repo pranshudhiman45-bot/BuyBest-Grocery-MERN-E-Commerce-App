@@ -45,7 +45,7 @@ export function OrderSummaryCard({
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#9b8a69]">
             Total Payable
           </p>
-          <div className="mt-3 flex items-end justify-between gap-4">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="text-3xl font-semibold leading-none">
                 {formatPrice(payableTotal)}
@@ -61,8 +61,8 @@ export function OrderSummaryCard({
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm font-semibold text-[#2c2417]">
-            <span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm font-semibold text-[#2c2417]">
+            <span className="break-words">
               Items ({cartSummary.itemCount}) · {formatPrice(cartSummary.subtotal)}
             </span>
             {showItemDetails ? (
@@ -92,9 +92,9 @@ export function OrderSummaryCard({
                   return (
                     <div
                       key={item.productId}
-                      className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 transition hover:bg-white/70"
+                      className="flex flex-col gap-3 rounded-xl px-2 py-2 transition hover:bg-white/70 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[#e8f5ee]">
                           {item.imageUrl ? (
                             <img
@@ -108,8 +108,8 @@ export function OrderSummaryCard({
                             </span>
                           )}
                         </div>
-                        <div className="flex flex-col leading-tight">
-                          <span className="text-sm font-medium text-[#2c2417] truncate">
+                        <div className="flex min-w-0 flex-col leading-tight">
+                          <span className="truncate text-sm font-medium text-[#2c2417]">
                             {item.name}
                           </span>
                           <span className="text-xs text-[#8f8168]">
@@ -118,7 +118,7 @@ export function OrderSummaryCard({
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end">
+                      <div className="flex flex-col sm:items-end">
                         <span className="text-sm font-semibold text-[#2c2417]">
                           {formatPrice(item.price * item.quantity)}
                         </span>
@@ -135,7 +135,7 @@ export function OrderSummaryCard({
             </div>
           ) : null}
         </div>
-        <div className="flex items-center justify-between gap-4 text-sm text-[#7d6d52]">
+        <div className="flex items-start justify-between gap-4 text-sm text-[#7d6d52]">
           <span>Delivery Fee</span>
           <span className="shrink-0 font-medium">
             {cartSummary.deliveryFee === 0 && cartSummary.subtotal >= FREE_DELIVERY_THRESHOLD
@@ -152,18 +152,18 @@ export function OrderSummaryCard({
             You have unlocked free delivery on this order.
           </div>
         )}
-        <div className="flex items-center justify-between gap-4 text-sm text-[#7d6d52]">
+        <div className="flex items-start justify-between gap-4 text-sm text-[#7d6d52]">
           <span>Tax</span>
           <span className="shrink-0">{formatPrice(cartSummary.tax)}</span>
         </div>
         {couponDiscount > 0 ? (
-          <div className="flex items-center justify-between gap-4 text-sm font-semibold text-[#a78410]">
-            <span>{appliedCouponCode ? `Coupon (${appliedCouponCode})` : "Coupon Discount"}</span>
+          <div className="flex items-start justify-between gap-4 text-sm font-semibold text-[#a78410]">
+            <span className="break-words">{appliedCouponCode ? `Coupon (${appliedCouponCode})` : "Coupon Discount"}</span>
             <span className="shrink-0">-{formatPrice(couponDiscount)}</span>
           </div>
         ) : null}
         <Separator className="bg-[#efe4d1]" />
-        <div className="flex items-center justify-between gap-4 text-base font-bold text-[#2c2417] sm:text-lg">
+        <div className="flex items-start justify-between gap-4 text-base font-bold text-[#2c2417] sm:text-lg">
           <span>Total</span>
           <span className="shrink-0 transition-all duration-300">{formatPrice(payableTotal)}</span>
         </div>

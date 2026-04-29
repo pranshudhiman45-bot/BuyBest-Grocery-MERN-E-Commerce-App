@@ -154,7 +154,7 @@ const CartPage = ({ currentUser = null }: CartPageProps) => {
           </div>
         </section>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)] xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
           <section className="space-y-4">
             <div className="rounded-[22px] border border-[#ece4d6] bg-white/80 p-4 shadow-[0_12px_28px_rgba(78,62,31,0.05)] sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -197,7 +197,7 @@ const CartPage = ({ currentUser = null }: CartPageProps) => {
             />
           </section>
 
-          <aside className="xl:sticky xl:top-24 xl:self-start">
+          <aside className="lg:sticky lg:top-24 lg:self-start">
             <OrderSummaryCard
               cartSummary={cartSummary}
               cartItems={cartItems}

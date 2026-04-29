@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react"
 
 export type AppView =
   | "shop"
+  | "about"
   | "offers"
   | "product"
   | "cart"
@@ -12,6 +13,7 @@ export type AppView =
   | "login"
   | "support"
   | "support-panel"
+  | "reset-password"
 
 type AppShellState = {
   activeView: AppView
@@ -21,6 +23,7 @@ type AppShellState = {
   loginMessage: string
   loginError: string
   loginRedirectView: AppView | null
+  resetPasswordToken: string
 }
 
 type PublicAppShellState = AppShellState
@@ -33,6 +36,7 @@ const DEFAULT_STATE: AppShellState = {
   loginMessage: "",
   loginError: "",
   loginRedirectView: null,
+  resetPasswordToken: "",
 }
 
 const mapPathToView = (pathname: string): Pick<
@@ -41,6 +45,10 @@ const mapPathToView = (pathname: string): Pick<
 > => {
   if (pathname === "/offers") {
     return { activeView: "offers", selectedProductId: null }
+  }
+
+  if (pathname === "/about") {
+    return { activeView: "about", selectedProductId: null }
   }
 
   if (pathname === "/cart") {
@@ -57,6 +65,10 @@ const mapPathToView = (pathname: string): Pick<
 
   if (pathname === "/login") {
     return { activeView: "login", selectedProductId: null }
+  }
+
+  if (pathname === "/reset-password") {
+    return { activeView: "reset-password", selectedProductId: null }
   }
 
   if (pathname === "/support") {
@@ -83,6 +95,8 @@ const mapRedirectToView = (redirect: string | null): AppView | null => {
   switch (redirect) {
     case "/offers":
       return "offers"
+    case "/about":
+      return "about"
     case "/cart":
       return "cart"
     case "/checkout":
@@ -114,6 +128,8 @@ const getInitialState = (): AppShellState => {
     loginMessage: url.searchParams.get("message") || "",
     loginError: url.searchParams.get("error") || "",
     loginRedirectView: mapRedirectToView(url.searchParams.get("redirect")),
+    resetPasswordToken:
+      activeView === "reset-password" ? url.searchParams.get("token") || "" : "",
   }
 }
 
@@ -121,6 +137,8 @@ const getRedirectPath = (view: AppView | null) => {
   switch (view) {
     case "offers":
       return "/offers"
+    case "about":
+      return "/about"
     case "cart":
       return "/cart"
     case "checkout":
@@ -133,6 +151,7 @@ const getRedirectPath = (view: AppView | null) => {
       return "/support-panel"
     case "product":
     case "login":
+    case "reset-password":
     case "shop":
     default:
       return "/"
@@ -155,6 +174,10 @@ export const getAppShellUrl = (state: PublicAppShellState) => {
 
   if (state.activeView === "offers") {
     return "/offers"
+  }
+
+  if (state.activeView === "about") {
+    return "/about"
   }
 
   if (state.activeView === "product" && state.selectedProductId) {
@@ -198,6 +221,15 @@ export const getAppShellUrl = (state: PublicAppShellState) => {
     return query ? `/login?${query}` : "/login"
   }
 
+  if (state.activeView === "reset-password") {
+    if (state.resetPasswordToken) {
+      searchParams.set("token", state.resetPasswordToken)
+    }
+
+    const query = searchParams.toString()
+    return query ? `/reset-password?${query}` : "/reset-password"
+  }
+
   return "/"
 }
 
@@ -213,6 +245,14 @@ const appShellSlice = createSlice({
       state.activeView = "shop"
       state.selectedProductId = null
       state.selectedCategory = action.payload?.category || "all"
+    },
+    openAbout: (state) => {
+      if (state.activeView !== "about") {
+        state.previousView = state.activeView
+      }
+
+      state.activeView = "about"
+      state.selectedProductId = null
     },
     openOffers: (state) => {
       if (state.activeView !== "offers") {
@@ -290,6 +330,7 @@ const appShellSlice = createSlice({
       state.loginError = action.payload?.error || ""
       state.loginRedirectView = action.payload?.redirectView ?? state.previousView
       state.selectedProductId = null
+      state.resetPasswordToken = ""
     },
     closeLogin: (state) => {
       state.activeView =
@@ -322,6 +363,7 @@ const appShellSlice = createSlice({
       state.loginMessage = action.payload.loginMessage
       state.loginError = action.payload.loginError
       state.loginRedirectView = action.payload.loginRedirectView
+      state.resetPasswordToken = action.payload.resetPasswordToken
     },
   },
 })
