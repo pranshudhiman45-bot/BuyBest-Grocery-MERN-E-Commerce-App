@@ -44,16 +44,14 @@ cp .env.example .env
 Frontend env value:
 
 ```env
-VITE_API_URL=http://localhost:3000
-```
-
-For your deployed backend, this can be set to:
-
-```env
 VITE_API_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com
 ```
 
-If `VITE_API_URL` is not provided, the app falls back to `http://localhost:3000`.
+For local frontend + local backend work, change it to:
+
+```env
+VITE_API_URL=http://localhost:3000
+```
 
 Run locally:
 
@@ -103,4 +101,5 @@ Default local frontend URL:
 - Routing is app-shell driven inside [src/App.tsx](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/frontend/src/App.tsx) rather than using a traditional multi-page React Router setup for the main storefront flow.
 - The app contains role-aware views for regular users, admins, and support staff.
 - Keep `.env` local and use [frontend/.env.example](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/frontend/.env.example) as the shared template.
+- Current production frontend URL: `https://buy-best-grocery-mern-e-commerce-ap.vercel.app`
 - `npm run build` is the best quick validation for the frontend; linting may still surface pre-existing issues in older files depending on current branch state.

@@ -127,16 +127,14 @@ cp frontend/.env.example frontend/.env
 The frontend uses one env variable:
 
 ```env
-VITE_API_URL=http://localhost:3000
-```
-
-For the current deployed backend, use:
-
-```env
 VITE_API_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com
 ```
 
-If omitted, it defaults to `http://localhost:3000`.
+For local-only frontend + local backend development, you can override it with:
+
+```env
+VITE_API_URL=http://localhost:3000
+```
 
 ### 4. Start both apps
 
@@ -233,3 +231,6 @@ Current default development credentials:
 - Socket.IO support chat uses the same backend server and validates the access-token cookie during connection.
 - The frontend now has a shared env template at [frontend/.env.example](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/frontend/.env.example); keep real environment-specific values in `frontend/.env`.
 - `RESET_PASSWORD_URL` should point to the frontend reset-password page, usually `http://localhost:5173/reset-password` in local development.
+- Current production pair:
+  Frontend `https://buy-best-grocery-mern-e-commerce-ap.vercel.app`
+  Backend `https://buybest-grocery-mern-e-commerce-app.onrender.com`

@@ -86,6 +86,15 @@ Important variables:
 - `RESET_PASSWORD_EXPIRY_MINUTES`
 - `RESET_PASSWORD_URL`
 
+Current deployment example:
+
+```env
+CORS_ORIGIN=https://buy-best-grocery-mern-e-commerce-ap.vercel.app,http://localhost:5173
+FRONTEND_URL=https://buy-best-grocery-mern-e-commerce-ap.vercel.app
+RESET_PASSWORD_URL=https://buy-best-grocery-mern-e-commerce-ap.vercel.app/reset-password
+GOOGLE_CALLBACK_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com/api/auth/google/callback
+```
+
 Default local API URL:
 
 - `http://localhost:3000`
@@ -139,3 +148,4 @@ If webhook delivery is missing, payment completion state can drift from the actu
 - The public route is `/api/catagories` because that is how it is currently implemented in the codebase.
 - `npm test` is still the default placeholder script and does not run an automated backend test suite yet.
 - The seed helper at [src/seed-support.js](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/backend/src/seed-support.js) can create or update the local support account.
+- Current production backend URL: `https://buybest-grocery-mern-e-commerce-app.onrender.com`
