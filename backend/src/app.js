@@ -12,7 +12,9 @@ const catagoryRouter = require('./routes/catagory.routes.js')
 const couponRouter = require('./routes/coupon.routes.js')
 const offerRouter = require('./routes/offer.routes.js')
 const supportRouter = require('./routes/support.routes.js')
-
+const paymentRouter = require('./routes/payment.routes.js')
+const settingsRouter = require('./routes/settings.routes.js')
+const idempotencyMiddleware = require('./middlewares/idempotency.middleware.js')
 const {
   notFoundHandler,
   errorHandler
@@ -32,8 +34,14 @@ app.use(cors({
   credentials: true
 }))
 app.use(cookieParser())
+app.post(
+  '/api/payment/webhook',
+  express.raw({ type: 'application/json' }),
+  paymentRouter.handleStripeWebhook
+)
 app.use(express.json())
 app.use(passport.initialize())
+app.use(idempotencyMiddleware())
 
 app.use('/api/auth', authRouter)
 app.use('/api/products', productRouter)
@@ -43,7 +51,8 @@ app.use('/api/catagories', catagoryRouter)
 app.use('/api/coupons', couponRouter)
 app.use('/api/offers', offerRouter)
 app.use('/api/support', supportRouter)
-
+app.use('/api/settings', settingsRouter)
+app.use("/api/payment", paymentRouter);
 app.use(notFoundHandler)
 app.use(errorHandler)
 

@@ -9,6 +9,9 @@ const {
   uploadProductImage
 } = require('../services/product.service.js')
 
+const escapeRegex = (value = '') =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const listProducts = asyncHandler(async (req, res) => {
   const { category = '', limit } = req.query
   await ensureStorefrontSeeded()
@@ -37,15 +40,16 @@ const searchProducts = asyncHandler(async (req, res) => {
   await ensureStorefrontSeeded()
 
   const normalizedQuery = String(q).trim()
+  const safeQuery = escapeRegex(normalizedQuery).slice(0, 100)
   const mongoQuery = normalizedQuery
     ? {
         $or: [
-          { name: { $regex: normalizedQuery, $options: 'i' } },
-          { brand: { $regex: normalizedQuery, $options: 'i' } },
-          { category: { $regex: normalizedQuery, $options: 'i' } },
-          { categoryLabel: { $regex: normalizedQuery, $options: 'i' } },
-          { size: { $regex: normalizedQuery, $options: 'i' } },
-          { offer: { $regex: normalizedQuery, $options: 'i' } }
+          { name: { $regex: safeQuery, $options: 'i' } },
+          { brand: { $regex: safeQuery, $options: 'i' } },
+          { category: { $regex: safeQuery, $options: 'i' } },
+          { categoryLabel: { $regex: safeQuery, $options: 'i' } },
+          { size: { $regex: safeQuery, $options: 'i' } },
+          { offer: { $regex: safeQuery, $options: 'i' } }
         ]
       }
     : {}

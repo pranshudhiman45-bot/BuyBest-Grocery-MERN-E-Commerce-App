@@ -37,8 +37,6 @@ const issueAuthTokens = async (user, res) => {
   await user.save()
 
   setAuthCookies(res, { accessToken, refreshToken })
-
-  return { accessToken, refreshToken }
 }
 
 const sendOtpForUser = async (user) => {
@@ -108,13 +106,13 @@ const verifyRegistrationOtp = async (body, res) => {
   }
 
   if (user.isVerified !== false) {
-    const tokens = await issueAuthTokens(user, res)
+    await issueAuthTokens(user, res)
 
     return {
       statusCode: 200,
       body: {
         message: 'User already verified',
-        ...buildAuthResponse(user, tokens)
+        ...buildAuthResponse(user)
       }
     }
   }
@@ -145,13 +143,13 @@ const verifyRegistrationOtp = async (body, res) => {
     console.error('Welcome email failed:', emailError)
   }
 
-  const tokens = await issueAuthTokens(user, res)
+  await issueAuthTokens(user, res)
 
   return {
     statusCode: 200,
     body: {
       message: 'Email verified successfully',
-      ...buildAuthResponse(user, tokens),
+      ...buildAuthResponse(user),
       welcomeEmailSent
     }
   }
@@ -256,13 +254,13 @@ const resetPassword = async (token, body, res) => {
   user.resetPasswordExpiresAt = null
   await user.save()
 
-  const tokens = await issueAuthTokens(user, res)
+  await issueAuthTokens(user, res)
 
   return {
     statusCode: 200,
     body: {
       message: 'Password reset successfully',
-      ...buildAuthResponse(user, tokens)
+      ...buildAuthResponse(user)
     }
   }
 }
@@ -321,13 +319,13 @@ const googleAuthCallback = async (googleUser, res) => {
     }
   }
 
-  const tokens = await issueAuthTokens(user, res)
+  await issueAuthTokens(user, res)
 
   return {
     statusCode: 200,
     body: {
       message: 'Google login successful',
-      ...buildAuthResponse(user, tokens),
+      ...buildAuthResponse(user),
       authProvider: AUTH_PROVIDERS.GOOGLE,
       welcomeEmailSent
     }
@@ -359,17 +357,16 @@ const loginUser = async (body, res) => {
     throw new AppError('Invalid credentials', 401)
   }
 
-  const tokens = await issueAuthTokens(user, res)
+  await issueAuthTokens(user, res)
 
   return {
     statusCode: 200,
-    body: buildAuthResponse(user, tokens)
+    body: buildAuthResponse(user)
   }
 }
 
 const refreshAccessToken = async ({ cookies, body, headers }, res) => {
-  const refreshToken =
-    cookies.refreshToken || body.refreshToken || headers['x-refresh-token']
+  const refreshToken = cookies.refreshToken
 
   if (!refreshToken) {
     throw new AppError('Refresh token is required', 401)
@@ -393,19 +390,19 @@ const refreshAccessToken = async ({ cookies, body, headers }, res) => {
     throw new AppError('Refresh token does not match', 401)
   }
 
-  const tokens = await issueAuthTokens(user, res)
+  await issueAuthTokens(user, res)
 
   return {
     statusCode: 200,
     body: {
       message: 'Access token refreshed successfully',
-      ...buildAuthResponse(user, tokens)
+      ...buildAuthResponse(user)
     }
   }
 }
 
 const logoutUser = async ({ cookies, body }, res) => {
-  const refreshToken = cookies.refreshToken || body.refreshToken
+  const refreshToken = cookies.refreshToken
 
   if (refreshToken) {
     try {

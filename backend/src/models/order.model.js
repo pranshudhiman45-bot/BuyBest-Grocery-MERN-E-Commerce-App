@@ -15,19 +15,35 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.ObjectId,
       ref: 'product'
     },
+    productSlug: {
+      type: String,
+      default: null
+    },
 
     productDetails: {
       _id: String,
       name: String,
       image: Array
     },
+    quantity: {
+      type: Number,
+      default: 1
+    },
     paymentId: {
+      type: String,
+      default: null
+    },
+    paymentMethod: {
       type: String,
       default: null
     },
     paymentStatus: {
       type: String,
       enum: ['pending', 'completed', 'failed']
+    },
+    couponCode: {
+      type: String,
+      default: null
     },
     deliveryAddress: {
       type: mongoose.Schema.ObjectId,
