@@ -21,11 +21,12 @@ const {
 } = require('./middlewares/error.middleware.js')
 
 const app = express()
+const allowAllCorsOrigins = env.corsOrigins.includes('*')
 
 app.use(helmet())
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || env.corsOrigins.includes(origin)) {
+    if (!origin || allowAllCorsOrigins || env.corsOrigins.includes(origin)) {
       return callback(null, true)
     }
 

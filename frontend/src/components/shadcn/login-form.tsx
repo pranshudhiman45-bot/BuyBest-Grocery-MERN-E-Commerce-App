@@ -19,7 +19,6 @@ import {
 import { Input } from "@/components/ui/input"
 import {
   forgotPassword,
-  getApiUrl,
   loginUser,
   registerUser,
   resendRegistrationOtp,
@@ -27,6 +26,7 @@ import {
   verifyRegistrationOtp,
   type AuthUser,
 } from "@/lib/auth"
+import { getApiUrl } from "@/lib/api-config"
 
 type LoginFormProps = React.ComponentProps<"div"> & {
   initialError?: string

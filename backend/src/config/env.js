@@ -3,7 +3,7 @@ const dotenv = require('dotenv')
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') })
 
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+const corsOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
@@ -30,15 +30,26 @@ if (nodeEnv === 'production') {
       'Production access and refresh token secrets must be different.'
     )
   }
+
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error('Production requires CORS_ORIGIN to be configured.')
+  }
+
+  if (!process.env.FRONTEND_URL) {
+    throw new Error('Production requires FRONTEND_URL to be configured.')
+  }
+
+  if (!process.env.RESET_PASSWORD_URL) {
+    throw new Error('Production requires RESET_PASSWORD_URL to be configured.')
+  }
 }
+
+const frontendUrl = process.env.FRONTEND_URL || corsOrigins[0] || ''
 
 module.exports = {
   nodeEnv,
   port: Number(process.env.PORT) || 3000,
-  frontendUrl:
-    process.env.FRONTEND_URL ||
-    corsOrigins[0] ||
-    'buy-best-grocery-mern-e-commerce-a5jixtua0.vercel.app',
+  frontendUrl,
   mongoUri: process.env.MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
   accessTokenSecret,
@@ -68,5 +79,5 @@ module.exports = {
   ),
   resetPasswordUrl:
     process.env.RESET_PASSWORD_URL ||
-    'http://localhost:3000/reset-password'
+    (frontendUrl ? `${frontendUrl.replace(/\/$/, '')}/reset-password` : '')
 }

@@ -1,4 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from "axios"
+import { API_BASE_URL } from "@/lib/api-config"
 
 import {
   clearStoredAuthUser,
@@ -192,10 +193,8 @@ type ApiErrorResponse = {
   message?: string
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "")
-
 const storeApi = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || undefined,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

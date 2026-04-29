@@ -1,4 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from "axios"
+import { API_BASE_URL } from "@/lib/api-config"
 
 export type AuthUser = {
   id: string
@@ -54,15 +55,10 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "")
-
 export const AUTH_USER_STORAGE_KEY = "auth_user"
 
-export const getApiUrl = (path: string) =>
-  `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`
-
 const authApi = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || undefined,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -70,7 +66,7 @@ const authApi = axios.create({
 })
 
 const refreshApi = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || undefined,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

@@ -4,8 +4,7 @@ import { io, Socket } from "socket.io-client"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { AuthUser } from "@/lib/auth"
-
-const API_BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "")
+import { API_BASE_URL } from "@/lib/api-config"
 
 type Message = {
   _id?: string
