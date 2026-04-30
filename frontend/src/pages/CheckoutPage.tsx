@@ -42,6 +42,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     cartItems,
     cartSummary,
     checkoutCart,
+    clearCartState,
     isCartLoading,
     refreshCart,
   } = useStore()
@@ -107,6 +108,10 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
         const status = await fetchStripeCheckoutStatus(sessionId)
 
         if (status.paymentStatus === "paid") {
+          clearCartState()
+          setAppliedCouponCode(null)
+          setCouponCode("")
+          setCouponFeedback("")
           await refreshCart()
           setCheckoutMessage("Payment confirmed and your order has been placed successfully.")
         } else {
@@ -124,7 +129,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     }
 
     void verifyStripeCheckout()
-  }, [currentUser, refreshCart, setCheckoutMessage])
+  }, [clearCartState, currentUser, refreshCart, setCheckoutMessage])
 
   useEffect(() => {
     const loadCoupons = async () => {

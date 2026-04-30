@@ -49,6 +49,7 @@ type StoreContextValue = {
   cartQuantities: Record<string, number>
   isCartLoading: boolean
   refreshCart: () => Promise<void>
+  clearCartState: () => void
   addToCart: (productId: string, quantity?: number) => Promise<void>
   updateCartQuantity: (productId: string, quantity: number) => Promise<void>
   removeFromCart: (productId: string) => Promise<void>
@@ -276,6 +277,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
   }, [currentUser, syncCartState])
 
+  const clearCartState = useCallback(() => {
+    writeGuestCartEntries([])
+    syncCartState({ items: [], summary: emptySummary })
+  }, [syncCartState])
+
   useEffect(() => {
     void refreshCart()
   }, [refreshCart])
@@ -438,6 +444,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       cartQuantities,
       isCartLoading,
       refreshCart,
+      clearCartState,
       addToCart,
       updateCartQuantity,
       removeFromCart,
@@ -449,6 +456,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       cartItems,
       cartQuantities,
       cartSummary,
+      clearCartState,
       checkoutCart,
       isCartLoading,
       refreshCart,
