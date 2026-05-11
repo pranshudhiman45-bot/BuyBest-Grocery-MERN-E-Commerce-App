@@ -39,9 +39,8 @@ const createRefreshToken = userId =>
   })
 
 const usesHttpsFrontend = /^https:\/\//i.test(env.frontendUrl || '')
-const usesHttpsGoogleCallback = /^https:\/\//i.test(env.googleCallbackUrl || '')
 const usesCrossSiteCookies =
-  env.nodeEnv === 'production' || usesHttpsFrontend || usesHttpsGoogleCallback
+  env.nodeEnv === 'production' || usesHttpsFrontend
 
 const getCookieOptions = maxAge => ({
   httpOnly: true,

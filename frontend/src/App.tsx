@@ -17,7 +17,6 @@ import {
   fetchCurrentUser,
   getStoredAuthUser,
   logoutUser,
-  storeAuthTokens,
   storeAuthUser,
   type AuthUser,
 } from "@/lib/auth"
@@ -147,9 +146,6 @@ const App = () => {
       const googleAuthStatus = url.searchParams.get("googleAuth")
       const googleAuthError =
         googleAuthStatus === "error" ? url.searchParams.get("error") : null
-      const authParams = new URLSearchParams(url.hash.replace(/^#/, ""))
-      const accessToken = authParams.get("accessToken")
-      const refreshToken = authParams.get("refreshToken")
 
       setIsBootstrappingAuth(true)
 
@@ -166,10 +162,6 @@ const App = () => {
       }
 
       try {
-        if (accessToken && refreshToken) {
-          storeAuthTokens({ accessToken, refreshToken })
-        }
-
         const response = await fetchCurrentUser()
         setCurrentUser(response.user)
         storeAuthUser(response.user)

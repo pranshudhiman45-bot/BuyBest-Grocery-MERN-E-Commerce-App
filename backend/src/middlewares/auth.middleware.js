@@ -4,11 +4,7 @@ const env = require('../config/env.js')
 const { ACCESS_TOKEN_COOKIE_NAME } = require('../constants/auth.constants.js')
 
 const authMiddleware = async (req, res, next) => {
-  const bearerToken = req.headers.authorization?.startsWith('Bearer ')
-    ? req.headers.authorization.split(' ')[1]
-    : null
-
-  const token = req.cookies[ACCESS_TOKEN_COOKIE_NAME] || bearerToken
+  const token = req.cookies[ACCESS_TOKEN_COOKIE_NAME]
 
   if (!token) {
     return res.status(401).json({ message: 'Authentication token missing' })

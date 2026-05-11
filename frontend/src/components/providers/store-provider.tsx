@@ -28,10 +28,10 @@ import {
 import type { AuthUser } from "@/lib/auth"
 import type { Product } from "@/lib/storefront"
 
-const GUEST_CART_STORAGE_KEY = "guest_cart_items"
 const DELIVERY_FEE = 40
 const FREE_DELIVERY_THRESHOLD = 300
 const DEFAULT_TAX_PERCENTAGE = 5
+let guestCartEntries: GuestCartEntry[] = []
 
 type GuestCartEntry = {
   productId: string
@@ -81,39 +81,17 @@ const normalizeMaxPerOrder = (value?: number | null) => {
 }
 
 const readGuestCartEntries = () => {
-  const storedCart = window.localStorage.getItem(GUEST_CART_STORAGE_KEY)
-
-  if (!storedCart) {
-    return [] as GuestCartEntry[]
-  }
-
-  try {
-    const parsedCart = JSON.parse(storedCart) as GuestCartEntry[]
-
-    if (!Array.isArray(parsedCart)) {
-      return []
-    }
-
-    return parsedCart.filter(
-      (entry) =>
-        typeof entry?.productId === "string" &&
-        entry.productId.length > 0 &&
-        typeof entry.quantity === "number" &&
-        entry.quantity > 0
-    )
-  } catch {
-    window.localStorage.removeItem(GUEST_CART_STORAGE_KEY)
-    return []
-  }
+  return guestCartEntries
 }
 
 const writeGuestCartEntries = (entries: GuestCartEntry[]) => {
-  if (entries.length === 0) {
-    window.localStorage.removeItem(GUEST_CART_STORAGE_KEY)
-    return
-  }
-
-  window.localStorage.setItem(GUEST_CART_STORAGE_KEY, JSON.stringify(entries))
+  guestCartEntries = entries.filter(
+    (entry) =>
+      typeof entry?.productId === "string" &&
+      entry.productId.length > 0 &&
+      typeof entry.quantity === "number" &&
+      entry.quantity > 0
+  )
 }
 
 const buildGuestSummary = (items: CartItem[], taxPercentage: number): CartSummary => {

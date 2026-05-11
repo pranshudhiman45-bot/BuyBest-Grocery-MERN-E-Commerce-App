@@ -10,18 +10,9 @@ export type AuthUser = {
   avatar?: string
 }
 
-export type AuthTokens = {
-  accessToken: string
-  refreshToken: string
-}
-
-type AuthSession = {
-  auth?: AuthTokens
-}
-
 export type LoginResponse = {
   user: AuthUser
-} & AuthSession
+}
 
 export type MessageResponse = {
   message: string
@@ -54,7 +45,7 @@ export type ResetPasswordResponse = LoginResponse & {
 
 export type CurrentUserResponse = {
   user: AuthUser
-} & AuthSession
+}
 
 type ApiErrorResponse = {
   message?: string
@@ -63,10 +54,6 @@ type ApiErrorResponse = {
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
-
-export const AUTH_USER_STORAGE_KEY = "auth_user"
-export const AUTH_ACCESS_TOKEN_STORAGE_KEY = "auth_access_token"
-export const AUTH_REFRESH_TOKEN_STORAGE_KEY = "auth_refresh_token"
 
 const authApi = axios.create({
   baseURL: API_BASE_URL || undefined,
@@ -98,70 +85,17 @@ const getApiErrorMessage = (
 }
 
 export const getStoredAuthUser = () => {
-  const storedUser = window.localStorage.getItem(AUTH_USER_STORAGE_KEY)
-
-  if (!storedUser) {
-    return null
-  }
-
-  try {
-    return JSON.parse(storedUser) as AuthUser
-  } catch {
-    window.localStorage.removeItem(AUTH_USER_STORAGE_KEY)
-    return null
-  }
+  return null
 }
 
-export const storeAuthUser = (user: AuthUser) => {
-  window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user))
-}
+export const storeAuthUser = (_user: AuthUser) => {}
 
-export const getStoredAuthTokens = (): AuthTokens | null => {
-  const accessToken = window.localStorage.getItem(AUTH_ACCESS_TOKEN_STORAGE_KEY)
-  const refreshToken = window.localStorage.getItem(AUTH_REFRESH_TOKEN_STORAGE_KEY)
-
-  if (!accessToken || !refreshToken) {
-    return null
-  }
-
-  return { accessToken, refreshToken }
-}
-
-export const storeAuthTokens = (tokens?: AuthTokens) => {
-  if (!tokens?.accessToken || !tokens?.refreshToken) {
-    return
-  }
-
-  window.localStorage.setItem(AUTH_ACCESS_TOKEN_STORAGE_KEY, tokens.accessToken)
-  window.localStorage.setItem(AUTH_REFRESH_TOKEN_STORAGE_KEY, tokens.refreshToken)
-}
-
-const persistAuthSession = <T extends AuthSession>(data: T) => {
-  storeAuthTokens(data.auth)
-  return data
-}
-
-export const clearStoredAuthUser = () => {
-  window.localStorage.removeItem(AUTH_USER_STORAGE_KEY)
-  window.localStorage.removeItem(AUTH_ACCESS_TOKEN_STORAGE_KEY)
-  window.localStorage.removeItem(AUTH_REFRESH_TOKEN_STORAGE_KEY)
-}
+export const clearStoredAuthUser = () => {}
 
 export async function refreshSession() {
-  const tokens = getStoredAuthTokens()
-
-  if (!getStoredAuthUser() && !tokens) {
-    throw new Error("No active session")
-  }
-
   if (!refreshRequest) {
     refreshRequest = refreshApi
-      .post<CurrentUserResponse>("/api/auth/refresh-token", {
-        refreshToken: tokens?.refreshToken,
-      })
-      .then((response) => {
-        persistAuthSession(response.data)
-      })
+      .post<CurrentUserResponse>("/api/auth/refresh-token")
       .then(() => undefined)
       .finally(() => {
         refreshRequest = null
@@ -170,16 +104,6 @@ export async function refreshSession() {
 
   return refreshRequest
 }
-
-authApi.interceptors.request.use((config) => {
-  const tokens = getStoredAuthTokens()
-
-  if (tokens?.accessToken) {
-    config.headers.Authorization = `Bearer ${tokens.accessToken}`
-  }
-
-  return config
-})
 
 authApi.interceptors.response.use(
   (response) => response,
@@ -225,7 +149,7 @@ export async function loginUser(email: string, password: string) {
       password,
     })
 
-    return persistAuthSession(response.data)
+    return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Login failed. Please try again."))
   }
@@ -285,7 +209,7 @@ export async function resetPassword(
       }
     )
 
-    return persistAuthSession(response.data)
+    return response.data
   } catch (error) {
     throw new Error(
       getApiErrorMessage(error, "Unable to reset your password.")
@@ -300,7 +224,7 @@ export async function verifyRegistrationOtp(email: string, otp: string) {
       otp,
     })
 
-    return persistAuthSession(response.data)
+    return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to verify OTP."))
   }
@@ -329,12 +253,8 @@ export async function fetchCurrentUser() {
 }
 
 export async function logoutUser() {
-  const tokens = getStoredAuthTokens()
-
   try {
-    const response = await refreshApi.post<MessageResponse>("/api/auth/logout", {
-      refreshToken: tokens?.refreshToken,
-    })
+    const response = await refreshApi.post<MessageResponse>("/api/auth/logout")
 
     return response.data
   } catch (error) {
