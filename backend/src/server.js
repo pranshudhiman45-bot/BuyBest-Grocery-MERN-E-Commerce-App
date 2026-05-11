@@ -21,6 +21,9 @@ const startServer = async () => {
 
   console.log(`Server is running on port ${env.port}`)
   console.log(`Socket.IO is ready at /socket.io (${io.engine.clientsCount} connected clients)`)
+  console.log(
+    `Auth cookies use ${/^https:\/\//i.test(env.frontendUrl || '') || /^https:\/\//i.test(env.googleCallbackUrl || '') || env.nodeEnv === 'production' ? 'SameSite=None; Secure' : 'SameSite=Strict'}`
+  )
 
   if (env.stripeSecretKey && env.stripeWebhookSecret) {
     console.log('Stripe webhook is ready at /api/payment/webhook')

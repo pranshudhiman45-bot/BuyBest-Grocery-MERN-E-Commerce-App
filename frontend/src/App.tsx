@@ -130,11 +130,35 @@ const App = () => {
   const [isLoggingOut, setIsLoggingOut] = React.useState(false)
 
   React.useEffect(() => {
+    const clearGoogleAuthParams = (url: URL) => {
+      url.searchParams.delete("googleAuth")
+      url.searchParams.delete("error")
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`
+      )
+    }
+
     const syncCurrentUser = async () => {
       const url = new URL(window.location.href)
       const googleAuthStatus = url.searchParams.get("googleAuth")
+      const googleAuthError =
+        googleAuthStatus === "error" ? url.searchParams.get("error") : null
 
       setIsBootstrappingAuth(true)
+
+      if (googleAuthError) {
+        dispatch(
+          appShellActions.openLogin({
+            error: googleAuthError,
+            redirectView: "shop",
+          })
+        )
+        clearGoogleAuthParams(url)
+        setIsBootstrappingAuth(false)
+        return
+      }
 
       try {
         const response = await fetchCurrentUser()
@@ -157,6 +181,9 @@ const App = () => {
           )
         }
       } finally {
+        if (googleAuthStatus) {
+          clearGoogleAuthParams(url)
+        }
         setIsBootstrappingAuth(false)
       }
     }

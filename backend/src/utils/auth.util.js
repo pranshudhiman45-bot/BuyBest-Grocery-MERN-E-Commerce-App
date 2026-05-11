@@ -38,10 +38,15 @@ const createRefreshToken = userId =>
     expiresIn: REFRESH_TOKEN_EXPIRES_IN
   })
 
+const usesHttpsFrontend = /^https:\/\//i.test(env.frontendUrl || '')
+const usesHttpsGoogleCallback = /^https:\/\//i.test(env.googleCallbackUrl || '')
+const usesCrossSiteCookies =
+  env.nodeEnv === 'production' || usesHttpsFrontend || usesHttpsGoogleCallback
+
 const getCookieOptions = maxAge => ({
   httpOnly: true,
-  sameSite: env.nodeEnv === 'production' ? 'none' : 'strict',
-  secure: env.nodeEnv === 'production',
+  sameSite: usesCrossSiteCookies ? 'none' : 'strict',
+  secure: usesCrossSiteCookies,
   ...(typeof maxAge === 'number' ? { maxAge } : {})
 })
 

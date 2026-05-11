@@ -5,6 +5,11 @@ const passport = require('passport')
 
 const sendFrontendRedirect = (res, targetUrl) => {
   const safeUrl = JSON.stringify(targetUrl)
+  const safeMetaUrl = targetUrl
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 
   return res
     .status(200)
@@ -14,7 +19,7 @@ const sendFrontendRedirect = (res, targetUrl) => {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="0;url=${targetUrl}" />
+    <meta http-equiv="refresh" content="0;url=${safeMetaUrl}" />
     <title>Redirecting...</title>
   </head>
   <body>
@@ -75,10 +80,11 @@ const appendRedirectStatus = (returnTo, params) => {
 const startGoogleAuth = (req, res, next) => {
   const returnTo =
     typeof req.query.returnTo === 'string' ? req.query.returnTo : ''
+  const safeReturnTo = resolveFrontendRedirectUrl(returnTo).toString()
 
   return passport.authenticate('google', {
     scope: ['profile', 'email'],
-    state: returnTo
+    state: safeReturnTo
   })(req, res, next)
 }
 
@@ -91,6 +97,7 @@ const completeGoogleAuth = (req, res, next) => {
         return sendFrontendRedirect(
           res,
           appendRedirectStatus(req.query.state, {
+            googleAuth: 'error',
             error: error.message || 'Google authentication failed'
           })
         )
@@ -100,6 +107,7 @@ const completeGoogleAuth = (req, res, next) => {
         return sendFrontendRedirect(
           res,
           appendRedirectStatus(req.query.state, {
+            googleAuth: 'error',
             error: 'Google authentication failed'
           })
         )
@@ -153,6 +161,7 @@ const googleAuthFailure = (req, res) => {
   return sendFrontendRedirect(
     res,
     appendRedirectStatus(req.query.state, {
+      googleAuth: 'error',
       error: 'Google authentication failed'
     })
   )

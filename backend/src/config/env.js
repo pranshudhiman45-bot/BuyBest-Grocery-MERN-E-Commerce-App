@@ -44,7 +44,8 @@ if (nodeEnv === 'production') {
   }
 }
 
-const frontendUrl = process.env.FRONTEND_URL || corsOrigins[0] || ''
+const frontendUrl =
+  process.env.FRONTEND_URL || corsOrigins[0] || 'http://localhost:5173'
 
 module.exports = {
   nodeEnv,
