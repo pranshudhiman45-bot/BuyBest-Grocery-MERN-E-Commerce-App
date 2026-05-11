@@ -1,6 +1,9 @@
 const nodemailer = require('nodemailer')
 const path = require('path')
+const dns = require('dns')
 const env = require('../config/env.js')
+
+dns.setDefaultResultOrder('ipv4first')
 
 const requiredEmailEnvVars = [
   ['EMAIL_USER', env.emailUser],
@@ -16,7 +19,13 @@ const missingEmailEnvVars = requiredEmailEnvVars
 const transporter = missingEmailEnvVars.length
   ? null
   : nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      family: 4,
+      connectionTimeout: 30_000,
+      greetingTimeout: 30_000,
+      socketTimeout: 30_000,
       auth: {
         type: 'OAuth2',
         user: env.emailUser,
