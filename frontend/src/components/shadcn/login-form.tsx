@@ -1,4 +1,5 @@
 import * as React from "react"
+import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -168,7 +169,17 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="overflow-hidden rounded-[30px] border border-[#ece4d6] bg-[linear-gradient(135deg,#fffdf8_0%,#fff8ea_40%,#f4fbf6_100%)] py-0 shadow-[0_24px_60px_rgba(78,62,31,0.10)]">
+      <Card className="relative overflow-hidden rounded-[30px] border border-[#ece4d6] bg-[linear-gradient(135deg,#fffdf8_0%,#fff8ea_40%,#f4fbf6_100%)] py-0 shadow-[0_24px_60px_rgba(78,62,31,0.10)]">
+        {onCancel ? (
+          <button
+            type="button"
+            aria-label="Close login"
+            className="absolute right-3 top-3 z-10 inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-[#7d6d52] shadow-sm ring-1 ring-[#efe4d1] transition hover:bg-[#faf4e8] hover:text-[#2c2417] focus:outline-none focus:ring-2 focus:ring-[#d8bf78]"
+            onClick={onCancel}
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
         <CardHeader className="border-b border-[#efe5d5] px-6 pt-6">
           <CardTitle>
             {mode === "forgot-password"
@@ -193,12 +204,12 @@ export function LoginForm({
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               {successMessage ? (
-                <Alert>
+                <Alert onDismiss={() => setSuccessMessage("")}>
                   <AlertDescription>{successMessage}</AlertDescription>
                 </Alert>
               ) : null}
               {error ? (
-                <Alert variant="destructive">
+                <Alert variant="destructive" onDismiss={() => setError("")}>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               ) : null}

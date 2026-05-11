@@ -14,7 +14,10 @@ export default function RequireAdmin({ currentUser = null }: RequireAdminProps) 
 
   return (
     <div className="mx-auto max-w-2xl rounded-[28px] bg-white/85 p-8 shadow-sm">
-      <Alert variant="destructive">
+      <Alert
+        variant="destructive"
+        onDismiss={() => dispatch(appShellActions.openShop(undefined))}
+      >
         <ShieldAlert className="size-4" />
         <AlertTitle>Admin access only</AlertTitle>
         <AlertDescription>

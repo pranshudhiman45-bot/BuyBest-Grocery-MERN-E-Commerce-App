@@ -1,4 +1,5 @@
 import * as React from "react"
+import { X } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -82,7 +83,17 @@ export default function ResetPasswordPage({
   return (
     <div className="min-h-screen bg-[#f7f4ee] px-4 py-10">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center">
-        <Card className="w-full overflow-hidden rounded-[30px] border border-[#ece4d6] bg-[linear-gradient(135deg,#fffdf8_0%,#fff8ea_40%,#f4fbf6_100%)] py-0 shadow-[0_24px_60px_rgba(78,62,31,0.10)]">
+        <Card className="relative w-full overflow-hidden rounded-[30px] border border-[#ece4d6] bg-[linear-gradient(135deg,#fffdf8_0%,#fff8ea_40%,#f4fbf6_100%)] py-0 shadow-[0_24px_60px_rgba(78,62,31,0.10)]">
+          {onBackToLogin ? (
+            <button
+              type="button"
+              aria-label="Close reset password"
+              className="absolute right-3 top-3 z-10 inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-[#7d6d52] shadow-sm ring-1 ring-[#efe4d1] transition hover:bg-[#faf4e8] hover:text-[#2c2417] focus:outline-none focus:ring-2 focus:ring-[#d8bf78]"
+              onClick={onBackToLogin}
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
           <CardHeader className="border-b border-[#efe5d5] px-6 pt-6">
             <CardTitle>Choose a new password</CardTitle>
             <CardDescription className="text-[#7d6d52]">
@@ -93,12 +104,12 @@ export default function ResetPasswordPage({
             <form onSubmit={handleSubmit}>
               <FieldGroup>
                 {successMessage ? (
-                  <Alert>
+                  <Alert onDismiss={() => setSuccessMessage("")}>
                     <AlertDescription>{successMessage}</AlertDescription>
                   </Alert>
                 ) : null}
                 {error ? (
-                  <Alert variant="destructive">
+                  <Alert variant="destructive" onDismiss={() => setError("")}>
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 ) : null}

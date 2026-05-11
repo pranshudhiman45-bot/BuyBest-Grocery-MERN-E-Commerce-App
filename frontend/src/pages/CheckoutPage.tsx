@@ -4,6 +4,7 @@ import {
   CreditCard,
   ShoppingCart,
   TriangleAlert,
+  X,
 } from "lucide-react"
 
 import { useStore } from "@/components/providers/store-provider"
@@ -389,6 +390,14 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
             onClick={() => setIsLoginAlertOpen(false)}
           />
           <div className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-[#cfe7dc] bg-white shadow-2xl">
+            <button
+              type="button"
+              aria-label="Close login prompt"
+              className="absolute right-3 top-3 z-20 inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-[#4E7C6B] shadow-sm ring-1 ring-[#dbeee5] transition hover:bg-[#f3fbf7] hover:text-[#123c31] focus:outline-none focus:ring-2 focus:ring-[#96cdb6]"
+              onClick={() => setIsLoginAlertOpen(false)}
+            >
+              <X className="size-4" />
+            </button>
             <div className="bg-gradient-to-r from-[#e9f7ef] via-[#f4fbf7] to-[#fff6df] px-6 py-5">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#1B4D3E] shadow-sm ring-1 ring-[#dbeee5]">
@@ -404,7 +413,10 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
             </div>
 
             <div className="space-y-4 px-6 py-5">
-              <Alert className="border-[#d9ebe3] bg-[#f8fcfa] text-[#123c31]">
+              <Alert
+                className="border-[#d9ebe3] bg-[#f8fcfa] text-[#123c31]"
+                onDismiss={() => setIsLoginAlertOpen(false)}
+              >
                 <TriangleAlert className="h-4 w-4" />
                 <AlertTitle>Good news</AlertTitle>
                 <AlertDescription>

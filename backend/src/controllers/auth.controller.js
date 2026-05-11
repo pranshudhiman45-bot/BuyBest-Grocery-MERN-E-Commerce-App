@@ -77,6 +77,20 @@ const appendRedirectStatus = (returnTo, params) => {
   return targetUrl.toString()
 }
 
+const appendRedirectHash = (targetUrl, params) => {
+  const url = new URL(targetUrl)
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''))
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value) {
+      hashParams.set(key, value)
+    }
+  }
+
+  url.hash = hashParams.toString()
+  return url.toString()
+}
+
 const startGoogleAuth = (req, res, next) => {
   const returnTo =
     typeof req.query.returnTo === 'string' ? req.query.returnTo : ''
@@ -150,10 +164,17 @@ const resetPassword = asyncHandler(async (req, res) => {
 })
 
 const googleAuthCallback = asyncHandler(async (req, res) => {
-  await authService.googleAuthCallback(req.user, res)
+  const response = await authService.googleAuthCallback(req.user, res)
+  const targetUrl = appendRedirectStatus(req.query.state, {
+    googleAuth: 'success'
+  })
+
   return sendFrontendRedirect(
     res,
-    appendRedirectStatus(req.query.state, { googleAuth: 'success' })
+    appendRedirectHash(targetUrl, {
+      accessToken: response.body.auth?.accessToken,
+      refreshToken: response.body.auth?.refreshToken
+    })
   )
 })
 

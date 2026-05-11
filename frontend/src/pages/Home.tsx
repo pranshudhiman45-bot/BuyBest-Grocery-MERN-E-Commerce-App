@@ -620,7 +620,10 @@ const Home = () => {
     >
       <div className="mx-auto flex w-full max-w-345 flex-col gap-5 px-3 pb-12 pt-4 md:px-5">
         {cartActionError ? (
-          <Alert variant="destructive">
+          <Alert
+            variant="destructive"
+            onDismiss={() => setCartActionError("")}
+          >
             <AlertTitle>Purchase limit reached</AlertTitle>
             <AlertDescription>{cartActionError}</AlertDescription>
           </Alert>

@@ -235,7 +235,10 @@ const ProductDetails = () => {
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,#f8f5ea_0%,#f4efe4_38%,#eef4ea_100%)]">
       <div className="mx-auto flex max-w-[1380px] flex-col gap-6 px-3 pb-12 pt-4 md:px-5">
       {cartActionError ? (
-        <Alert variant="destructive">
+        <Alert
+          variant="destructive"
+          onDismiss={() => setCartActionError("")}
+        >
           <AlertTitle>Purchase limit reached</AlertTitle>
           <AlertDescription>{cartActionError}</AlertDescription>
         </Alert>

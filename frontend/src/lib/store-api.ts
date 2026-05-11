@@ -3,6 +3,7 @@ import { API_BASE_URL } from "@/lib/api-config"
 
 import {
   clearStoredAuthUser,
+  getStoredAuthTokens,
   refreshSession,
 } from "@/lib/auth"
 import type { CouponDefinition } from "@/lib/offers"
@@ -208,6 +209,16 @@ const getApiErrorMessage = (error: unknown, fallbackMessage: string) => {
 
   return fallbackMessage
 }
+
+storeApi.interceptors.request.use((config) => {
+  const tokens = getStoredAuthTokens()
+
+  if (tokens?.accessToken) {
+    config.headers.Authorization = `Bearer ${tokens.accessToken}`
+  }
+
+  return config
+})
 
 storeApi.interceptors.response.use(
   (response) => response,

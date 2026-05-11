@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { LayoutDashboard, LogOut, MapPin, Search, ShoppingCart, TriangleAlert, UserCog } from "lucide-react"
+import { LayoutDashboard, LogOut, MapPin, Search, ShoppingCart, TriangleAlert, UserCog, X } from "lucide-react"
 
 import Logo from "../../assests/image.png"
 import { ProfileEditorSheet } from "@/components/profile/ProfileEditorSheet"
@@ -658,6 +658,15 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             }}
           />
           <div className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-[#ece4d6] bg-white shadow-2xl">
+            <button
+              type="button"
+              aria-label="Close logout confirmation"
+              className="absolute right-3 top-3 z-20 inline-flex size-9 items-center justify-center rounded-full bg-white/90 text-[#7d6d52] shadow-sm ring-1 ring-[#efe4d1] transition hover:bg-[#faf4e8] hover:text-[#2c2417] focus:outline-none focus:ring-2 focus:ring-[#d8bf78]"
+              onClick={() => setIsLogoutAlertOpen(false)}
+              disabled={isLoggingOut}
+            >
+              <X className="size-4" />
+            </button>
             <div className="bg-gradient-to-r from-[#fff7e5] via-[#fffdf8] to-[#f3fbf5] px-6 py-5">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#624c11] shadow-sm ring-1 ring-[#efe4d1]">
@@ -673,7 +682,10 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             </div>
 
             <div className="space-y-4 px-6 py-5">
-              <Alert className="border-[#efe4d1] bg-[#fcf8ef] text-[#2c2417]">
+              <Alert
+                className="border-[#efe4d1] bg-[#fcf8ef] text-[#2c2417]"
+                onDismiss={() => setIsLogoutAlertOpen(false)}
+              >
                 <TriangleAlert className="h-4 w-4" />
                 <AlertTitle>Before you go</AlertTitle>
                 <AlertDescription>
@@ -707,7 +719,11 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
 
       {locationAlert ? (
         <div className="fixed right-4 top-20 z-50 w-[calc(100vw-2rem)] max-w-sm sm:right-6">
-          <Alert variant="destructive" className="border-[#f1d0d0] bg-white shadow-[0_18px_44px_rgba(44,36,23,0.12)]">
+          <Alert
+            variant="destructive"
+            className="border-[#f1d0d0] bg-white shadow-[0_18px_44px_rgba(44,36,23,0.12)]"
+            onDismiss={() => setLocationAlert("")}
+          >
             <TriangleAlert className="h-4 w-4" />
             <AlertTitle>Location unavailable</AlertTitle>
             <AlertDescription>{locationAlert}</AlertDescription>

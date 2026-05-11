@@ -173,7 +173,11 @@ export function CartLineItemCard({
               </p>
             ) : null}
             {actionError ? (
-              <Alert variant="destructive" className="py-2">
+              <Alert
+                variant="destructive"
+                className="py-2"
+                onDismiss={() => setActionError("")}
+              >
                 <AlertDescription className="text-xs">{actionError}</AlertDescription>
               </Alert>
             ) : null}

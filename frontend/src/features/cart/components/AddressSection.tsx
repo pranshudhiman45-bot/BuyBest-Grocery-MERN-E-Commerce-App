@@ -208,7 +208,10 @@ export function AddressSection({
       </div>
 
       {feedback ? (
-        <Alert className="border-[#eadfca] bg-[#fff9ef] text-[#6a5620]">
+        <Alert
+          className="border-[#eadfca] bg-[#fff9ef] text-[#6a5620]"
+          onDismiss={() => setFeedback("")}
+        >
           <TriangleAlert className="h-4 w-4" />
           <AlertTitle>Address update</AlertTitle>
           <AlertDescription>{feedback}</AlertDescription>

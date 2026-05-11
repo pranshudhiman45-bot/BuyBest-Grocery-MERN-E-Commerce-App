@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -22,15 +23,32 @@ const alertVariants = cva(
 function Alert({
   className,
   variant,
+  onDismiss,
+  children,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+}: React.ComponentProps<"div"> &
+  VariantProps<typeof alertVariants> & {
+    onDismiss?: () => void
+  }) {
   return (
     <div
       data-slot="alert"
       role="alert"
-      className={cn(alertVariants({ variant }), className)}
+      className={cn(alertVariants({ variant }), onDismiss && "pr-10", className)}
       {...props}
-    />
+    >
+      {children}
+      {onDismiss ? (
+        <button
+          type="button"
+          aria-label="Close alert"
+          className="absolute right-2 top-2 inline-flex size-7 items-center justify-center rounded-full text-current/70 transition hover:bg-black/5 hover:text-current focus:outline-none focus:ring-2 focus:ring-current/25"
+          onClick={onDismiss}
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
+    </div>
   )
 }
 

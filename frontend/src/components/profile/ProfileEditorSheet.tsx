@@ -197,13 +197,16 @@ export function ProfileEditorSheet({
 
         <div className="space-y-5 px-6 py-6">
           {feedback ? (
-            <Alert className="border-[#e5d9c4] bg-[#fff8ed] text-[#624c11]">
+            <Alert
+              className="border-[#e5d9c4] bg-[#fff8ed] text-[#624c11]"
+              onDismiss={() => setFeedback("")}
+            >
               <AlertDescription>{feedback}</AlertDescription>
             </Alert>
           ) : null}
 
           {error ? (
-            <Alert variant="destructive">
+            <Alert variant="destructive" onDismiss={() => setError("")}>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
