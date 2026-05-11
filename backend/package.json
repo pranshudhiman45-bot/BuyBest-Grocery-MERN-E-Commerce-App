@@ -5,8 +5,11 @@
   "main": "src/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npx nodemon src/server.js",
-    "start": "node src/server.js"
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check:socket": "node scripts/check-socket.js",
+    "check:stripe-webhook": "node scripts/check-stripe-webhook.js",
+    "check:stripe-flow": "node scripts/check-stripe-flow.js"
   },
   "keywords": [],
   "author": "",

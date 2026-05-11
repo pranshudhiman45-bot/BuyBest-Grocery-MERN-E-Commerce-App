@@ -134,6 +134,26 @@ Local webhook forwarding example:
 stripe listen --forward-to localhost:3000/api/payment/webhook
 ```
 
+Copy the `whsec_...` value printed by the Stripe CLI into `STRIPE_WEBHOOK_SECRET`.
+For production, add the deployed backend endpoint in the Stripe dashboard:
+
+```text
+https://your-backend-domain/api/payment/webhook
+```
+
+Webhook events used by the app:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
+- `checkout.session.expired`
+
+You can verify local config with:
+
+```bash
+npm run check:stripe-webhook
+```
+
 If webhook delivery is missing, payment completion state can drift from the actual Stripe session result.
 
 ## Support Chat

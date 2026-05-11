@@ -1,7 +1,6 @@
 const asyncHandler = require('../utils/async-handler.js')
 const authService = require('../services/auth.service.js')
 const env = require('../config/env.js')
-const AppError = require('../utils/app-error.js')
 const passport = require('passport')
 
 const sendFrontendRedirect = (res, targetUrl) => {
@@ -89,11 +88,21 @@ const completeGoogleAuth = (req, res, next) => {
     { session: false },
     (error, user) => {
       if (error) {
-        return next(error)
+        return sendFrontendRedirect(
+          res,
+          appendRedirectStatus(req.query.state, {
+            error: error.message || 'Google authentication failed'
+          })
+        )
       }
 
       if (!user) {
-        return next(new AppError('Google authentication failed', 401))
+        return sendFrontendRedirect(
+          res,
+          appendRedirectStatus(req.query.state, {
+            error: 'Google authentication failed'
+          })
+        )
       }
 
       req.user = user

@@ -443,7 +443,9 @@ const finalizeStripeSessionOrders = async (sessionId) => {
     throw new AppError('No pending order found for this Stripe session', 404)
   }
 
-  const pendingOrders = orders.filter((order) => order.paymentStatus !== 'completed')
+  const pendingOrders = orders.filter((order) =>
+    ['pending', 'processing'].includes(order.paymentStatus)
+  )
 
   if (pendingOrders.length === 0) {
     return orders
@@ -451,27 +453,39 @@ const finalizeStripeSessionOrders = async (sessionId) => {
 
   for (const order of pendingOrders) {
     const quantity = Math.max(1, Number(order.quantity) || 1)
-    const productDocument = await productModel.findById(order.productId)
+    const claimedOrder = await orderModel.findOneAndUpdate(
+      {
+        _id: order._id,
+        paymentStatus: { $in: ['pending', 'processing'] }
+      },
+      {
+        paymentStatus: 'processing'
+      },
+      { returnDocument: 'after' }
+    )
 
-    if (!productDocument) {
-      order.paymentStatus = 'failed'
-      await order.save()
-      throw new AppError(`Product for order ${order.orderId} is no longer available`, 409)
+    if (!claimedOrder) {
+      continue
     }
 
-    const availableStock = normalizeStock(productDocument.stock)
+    const stockUpdate = await productModel.updateOne(
+      {
+        _id: claimedOrder.productId,
+        stock: { $gte: quantity }
+      },
+      {
+        $inc: { stock: -quantity }
+      }
+    )
 
-    if (availableStock < quantity) {
-      order.paymentStatus = 'failed'
-      await order.save()
-      throw new AppError(`Not enough stock available to finalize order ${order.orderId}`, 409)
+    if (stockUpdate.matchedCount === 0) {
+      claimedOrder.paymentStatus = 'failed'
+      await claimedOrder.save()
+      throw new AppError(`Not enough stock available to finalize order ${claimedOrder.orderId}`, 409)
     }
 
-    productDocument.stock = availableStock - quantity
-    await productDocument.save()
-
-    order.paymentStatus = 'completed'
-    await order.save()
+    claimedOrder.paymentStatus = 'completed'
+    await claimedOrder.save()
   }
 
   await attachOrdersToUserHistory(orders[0].userId, orders)

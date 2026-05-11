@@ -52,12 +52,25 @@ const setupSocket = (server) => {
     }
   })
 
+  console.log(
+    `Socket.IO initialized${
+      env.corsOrigins.length ? ` for origins: ${env.corsOrigins.join(', ')}` : ''
+    }`
+  )
+
+  io.engine.on('connection_error', (error) => {
+    console.error(
+      `Socket.IO connection error: ${error.message || 'Unknown socket error'}`
+    )
+  })
+
   io.use(async (socket, next) => {
     try {
       const cookies = parseCookieHeader(socket.handshake.headers.cookie || '')
       const token = cookies[ACCESS_TOKEN_COOKIE_NAME]
 
       if (!token) {
+        console.warn('Socket authentication rejected: missing access token')
         return next(new Error('Authentication required'))
       }
 
@@ -65,12 +78,14 @@ const setupSocket = (server) => {
       const user = await userModel.findById(decoded.userId)
 
       if (!user) {
+        console.warn('Socket authentication rejected: user not found')
         return next(new Error('User not found'))
       }
 
       socket.user = user
       return next()
     } catch (error) {
+      console.warn('Socket authentication rejected: invalid access token')
       return next(new Error('Invalid authentication token'))
     }
   })
@@ -151,6 +166,8 @@ const setupSocket = (server) => {
       console.log(`Socket disconnected: ${socket.id}`)
     })
   })
+
+  return io
 }
 
 const getIO = () => {

@@ -204,6 +204,18 @@ const App = () => {
       return
     }
 
+    const currentLocation = new URL(window.location.href)
+    const isStripeReturnToCheckout =
+      activeView === "checkout" &&
+      currentLocation.pathname === "/checkout" &&
+      Boolean(currentLocation.searchParams.get("stripe"))
+
+    // Preserve Stripe return params long enough for the checkout page to verify payment.
+    if (isStripeReturnToCheckout) {
+      hasMountedHistorySync.current = true
+      return
+    }
+
     const nextUrl = getAppShellUrl({
       activeView,
       previousView: activeView,
@@ -214,7 +226,7 @@ const App = () => {
       loginRedirectView,
       resetPasswordToken,
     })
-    const currentUrl = `${window.location.pathname}${window.location.search}`
+    const currentUrl = `${currentLocation.pathname}${currentLocation.search}`
 
     if (currentUrl === nextUrl) {
       hasMountedHistorySync.current = true

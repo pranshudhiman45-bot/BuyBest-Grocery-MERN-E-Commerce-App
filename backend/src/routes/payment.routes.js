@@ -36,12 +36,28 @@ const handleStripeWebhook = async (req, res) => {
   }
 
   try {
-    if (event.type === 'checkout.session.completed') {
-      await finalizeStripeSessionOrders(event.data.object.id)
+    const session = event.data.object
+
+    if (
+      event.type === 'checkout.session.completed' ||
+      event.type === 'checkout.session.async_payment_succeeded'
+    ) {
+      if (session.payment_status === 'paid') {
+        await finalizeStripeSessionOrders(session.id)
+        console.log(`Stripe session finalized: ${session.id}`)
+      } else {
+        console.log(
+          `Stripe session ${session.id} completed with payment_status=${session.payment_status}; waiting for paid event.`
+        )
+      }
     }
 
-    if (event.type === 'checkout.session.expired') {
-      await markStripeSessionOrdersFailed(event.data.object.id)
+    if (
+      event.type === 'checkout.session.expired' ||
+      event.type === 'checkout.session.async_payment_failed'
+    ) {
+      await markStripeSessionOrdersFailed(session.id)
+      console.log(`Stripe session marked failed: ${session.id}`)
     }
   } catch (error) {
     console.error(error)

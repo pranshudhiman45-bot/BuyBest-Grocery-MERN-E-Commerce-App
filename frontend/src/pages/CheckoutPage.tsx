@@ -104,10 +104,24 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     }
 
     const verifyStripeCheckout = async () => {
-      try {
-        const status = await fetchStripeCheckoutStatus(sessionId)
+      const wait = (durationMs: number) =>
+        new Promise((resolve) => {
+          window.setTimeout(resolve, durationMs)
+        })
 
-        if (status.paymentStatus === "paid") {
+      try {
+        let latestStatus = await fetchStripeCheckoutStatus(sessionId)
+
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          if (latestStatus.paymentStatus === "paid") {
+            break
+          }
+
+          await wait(1200)
+          latestStatus = await fetchStripeCheckoutStatus(sessionId)
+        }
+
+        if (latestStatus.paymentStatus === "paid") {
           clearCartState()
           setAppliedCouponCode(null)
           setCouponCode("")

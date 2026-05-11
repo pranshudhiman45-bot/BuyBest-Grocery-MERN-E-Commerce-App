@@ -22,11 +22,14 @@ const errorHandler = (error, req, res, next) => {
     message: error.message || 'Server error'
   }
 
-  if (nodeEnv !== 'production' && error.stack) {
+  if (nodeEnv !== 'production' && error.stack && !error.isOperational) {
     response.stack = error.stack
   }
 
-  console.error(error)
+  if (statusCode >= 500 || !error.isOperational) {
+    console.error(error)
+  }
+
   res.status(statusCode).json(response)
 }
 
