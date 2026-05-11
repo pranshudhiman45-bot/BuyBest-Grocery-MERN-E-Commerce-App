@@ -168,14 +168,19 @@ const App = () => {
         if (googleAuthStatus === "success") {
           dispatch(appShellActions.completeLogin())
         }
-      } catch {
+      } catch (error) {
         clearStoredAuthUser()
         setCurrentUser(null)
 
         if (googleAuthStatus === "success") {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Unable to complete Google login"
+
           dispatch(
             appShellActions.openLogin({
-              error: "Unable to complete Google login",
+              error: message,
               redirectView: "shop",
             })
           )

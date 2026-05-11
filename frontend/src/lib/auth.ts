@@ -264,10 +264,6 @@ export async function resendRegistrationOtp(email: string) {
 }
 
 export async function fetchCurrentUser() {
-  if (!getStoredAuthUser()) {
-    throw new Error("No active session")
-  }
-
   try {
     const response = await authApi.get<CurrentUserResponse>("/api/auth/me")
 
