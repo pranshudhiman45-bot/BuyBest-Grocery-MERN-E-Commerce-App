@@ -5,25 +5,74 @@ const env = require('../config/env.js')
 
 dns.setDefaultResultOrder('ipv4first')
 
-const requiredEmailEnvVars = [
+const emailProvider = (env.emailProvider || (env.resendApiKey ? 'resend' : 'smtp')).toLowerCase()
+const usesResend = emailProvider === 'resend'
+const usesSmtp = emailProvider === 'smtp'
+
+const requiredSmtpEnvVars = [
   ['EMAIL_USER', env.emailUser],
   ['EMAIL_CLIENT_ID (or CLIENT_ID)', env.emailClientId],
   ['EMAIL_CLIENT_SECRET (or CLIENT_SECRET)', env.emailClientSecret],
   ['EMAIL_REFRESH_TOKEN (or REFRESH_TOKEN / REFESH_TOKEN)', env.emailRefreshToken]
 ]
 
+const requiredResendEnvVars = [
+  ['RESEND_API_KEY', env.resendApiKey],
+  ['EMAIL_FROM (or RESEND_FROM_EMAIL)', env.emailFrom]
+]
+
+const requiredEmailEnvVars = usesResend ? requiredResendEnvVars : requiredSmtpEnvVars
+
 const missingEmailEnvVars = requiredEmailEnvVars
   .filter(([, value]) => !value)
   .map(([name]) => name)
 
 const gmailSmtpHost = 'smtp.gmail.com'
+const gmailSmtpPort = 465
+
+const logEmailDebug = (message, details = {}) => {
+  console.log('[email debug]', message, {
+    smtpHost: gmailSmtpHost,
+    smtpPort: gmailSmtpPort,
+    emailProvider,
+    emailUserConfigured: Boolean(env.emailUser),
+    emailFromConfigured: Boolean(env.emailFrom),
+    emailClientIdConfigured: Boolean(env.emailClientId),
+    emailClientSecretConfigured: Boolean(env.emailClientSecret),
+    emailRefreshTokenConfigured: Boolean(env.emailRefreshToken),
+    emailAccessTokenConfigured: Boolean(env.emailAccessToken),
+    resendApiKeyConfigured: Boolean(env.resendApiKey),
+    ...details
+  })
+}
+
+const getEmailErrorDebugDetails = (error) => {
+  if (!error) {
+    return {}
+  }
+
+  return {
+    name: error.name,
+    code: error.code,
+    command: error.command,
+    errno: error.errno,
+    syscall: error.syscall,
+    address: error.address,
+    port: error.port,
+    responseCode: error.responseCode,
+    response: error.response,
+    message: error.message
+  }
+}
 
 const createTransporter = async () => {
+  logEmailDebug('Resolving Gmail SMTP IPv4 address')
   const { address } = await dns.promises.lookup(gmailSmtpHost, { family: 4 })
+  logEmailDebug('Resolved Gmail SMTP IPv4 address', { resolvedAddress: address })
 
   return nodemailer.createTransport({
     host: address,
-    port: 465,
+    port: gmailSmtpPort,
     secure: true,
     connectionTimeout: 30_000,
     greetingTimeout: 30_000,
@@ -44,7 +93,9 @@ const createTransporter = async () => {
 
 const transporterPromise = missingEmailEnvVars.length
   ? null
-  : createTransporter()
+  : usesSmtp
+    ? createTransporter()
+    : null
 
 const getEmailTransportErrorMessage = (error) => {
   if (!error) {
@@ -62,43 +113,117 @@ const getEmailTransportErrorMessage = (error) => {
   return error.message || String(error)
 }
 
-if (missingEmailEnvVars.length) {
+if (!usesResend && !usesSmtp) {
+  console.error(
+    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${emailProvider}. Use "resend" or "smtp".`
+  )
+} else if (missingEmailEnvVars.length) {
   console.error(
     `Email service is disabled. Missing env vars: ${missingEmailEnvVars.join(', ')}`
   )
+} else if (usesResend) {
+  logEmailDebug('Resend email API configuration loaded')
+  console.log('Email server is ready to send messages through Resend API')
 } else {
+  logEmailDebug('Email service configuration loaded')
   transporterPromise.then((transporter) => transporter.verify((error) => {
     if (error) {
       console.error('Error connecting to email server:', getEmailTransportErrorMessage(error))
+      logEmailDebug('Transport verify failed', getEmailErrorDebugDetails(error))
     } else {
       console.log('Email server is ready to send messages')
+      logEmailDebug('Transport verify succeeded')
     }
   })).catch((error) => {
     console.error('Error connecting to email server:', getEmailTransportErrorMessage(error))
+    logEmailDebug('Transport initialization failed', getEmailErrorDebugDetails(error))
   })
 }
 
+const sendResendEmail = async (to, subject, text, html, attachments = []) => {
+  logEmailDebug('Sending email through Resend API', {
+    to,
+    subject,
+    attachmentCount: attachments.length
+  })
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      from: env.emailFrom,
+      to: [to],
+      subject,
+      text,
+      html
+    })
+  })
+
+  const responseBody = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    logEmailDebug('Resend API send failed', {
+      status: response.status,
+      statusText: response.statusText,
+      response: responseBody
+    })
+
+    throw new Error(
+      responseBody?.message ||
+      responseBody?.error ||
+      `Resend API failed with status ${response.status}`
+    )
+  }
+
+  logEmailDebug('Resend API email sent', {
+    id: responseBody?.id
+  })
+
+  return responseBody
+}
+
+const sendSmtpEmail = async (to, subject, text, html, attachments = []) => {
+  const transporter = await transporterPromise
+  logEmailDebug('Sending email through SMTP', {
+    to,
+    subject,
+    attachmentCount: attachments.length
+  })
+  const info = await transporter.sendMail({
+    from: `"Buy Best" <${env.emailFrom}>`,
+    to,
+    subject,
+    text,
+    html,
+    attachments
+  })
+
+  console.log('Message sent: %s', info.messageId)
+  logEmailDebug('SMTP email sent', {
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response
+  })
+  return info
+}
+
 const sendEmail = async (to, subject, text, html, attachments = []) => {
-  if (!transporterPromise) {
+  if (missingEmailEnvVars.length || (!usesResend && !transporterPromise)) {
     throw new Error(
       `Email transport is not configured. Missing env vars: ${missingEmailEnvVars.join(', ')}`
     )
   }
 
   try {
-    const transporter = await transporterPromise
-    const info = await transporter.sendMail({
-      from: `"Buy Best" <${env.emailUser}>`,
-      to,
-      subject,
-      text,
-      html,
-      attachments
-    })
-
-    console.log('Message sent: %s', info.messageId)
-    return info
+    return usesResend
+      ? sendResendEmail(to, subject, text, html, attachments)
+      : sendSmtpEmail(to, subject, text, html, attachments)
   } catch (error) {
+    logEmailDebug('Email send failed', getEmailErrorDebugDetails(error))
     throw new Error(getEmailTransportErrorMessage(error))
   }
 }

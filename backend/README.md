@@ -165,6 +165,9 @@ If webhook delivery is missing, payment completion state can drift from the actu
 ## Operational Notes
 
 - `CORS_ORIGIN` accepts a comma-separated list and is parsed into the allowed origin list.
+- On Render free instances, use the HTTPS email API path instead of Gmail SMTP:
+  set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and `EMAIL_FROM`/`RESEND_FROM_EMAIL`.
+  Gmail SMTP ports `465`/`587` may be blocked in production even when they work locally.
 - The public route is `/api/catagories` because that is how it is currently implemented in the codebase.
 - `npm test` is still the default placeholder script and does not run an automated backend test suite yet.
 - The seed helper at [src/seed-support.js](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/backend/src/seed-support.js) can create or update the local support account.
