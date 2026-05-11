@@ -5,7 +5,11 @@ const env = require('../config/env.js')
 
 dns.setDefaultResultOrder('ipv4first')
 
-const emailProvider = (env.emailProvider || (env.resendApiKey ? 'resend' : 'smtp')).toLowerCase()
+const defaultEmailProvider =
+  env.resendApiKey || env.isRender || env.nodeEnv === 'production'
+    ? 'resend'
+    : 'smtp'
+const emailProvider = (env.emailProvider || defaultEmailProvider).toLowerCase()
 const usesResend = emailProvider === 'resend'
 const usesSmtp = emailProvider === 'smtp'
 
@@ -35,6 +39,9 @@ const logEmailDebug = (message, details = {}) => {
     smtpHost: gmailSmtpHost,
     smtpPort: gmailSmtpPort,
     emailProvider,
+    defaultEmailProvider,
+    isRender: Boolean(env.isRender),
+    nodeEnv: env.nodeEnv,
     emailUserConfigured: Boolean(env.emailUser),
     emailFromConfigured: Boolean(env.emailFrom),
     emailClientIdConfigured: Boolean(env.emailClientId),
@@ -126,6 +133,13 @@ if (!usesResend && !usesSmtp) {
   console.log('Email server is ready to send messages through Resend API')
 } else {
   logEmailDebug('Email service configuration loaded')
+  if (env.isRender || env.nodeEnv === 'production') {
+    console.warn(
+      '[email debug] SMTP provider is enabled in production/Render. ' +
+      'If this service runs on Render free, outbound SMTP ports can timeout. ' +
+      'Set EMAIL_PROVIDER=resend with RESEND_API_KEY and EMAIL_FROM.'
+    )
+  }
   transporterPromise.then((transporter) => transporter.verify((error) => {
     if (error) {
       console.error('Error connecting to email server:', getEmailTransportErrorMessage(error))

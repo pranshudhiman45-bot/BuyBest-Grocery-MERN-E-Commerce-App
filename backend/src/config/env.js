@@ -9,6 +9,7 @@ const corsOrigins = (process.env.CORS_ORIGIN || '')
   .filter(Boolean)
 
 const nodeEnv = process.env.NODE_ENV || 'development'
+const isRender = process.env.RENDER === 'true'
 const accessTokenSecret =
   process.env.ACCESS_TOKEN_SECRET ||
   process.env.ACCES_TOKEN_SECRET ||
@@ -49,6 +50,7 @@ const frontendUrl =
 
 module.exports = {
   nodeEnv,
+  isRender,
   port: Number(process.env.PORT) || 3000,
   frontendUrl,
   mongoUri: process.env.MONGO_URI,
