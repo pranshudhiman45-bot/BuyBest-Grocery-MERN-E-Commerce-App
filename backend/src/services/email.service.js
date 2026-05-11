@@ -16,25 +16,35 @@ const missingEmailEnvVars = requiredEmailEnvVars
   .filter(([, value]) => !value)
   .map(([name]) => name)
 
-const transporter = missingEmailEnvVars.length
+const gmailSmtpHost = 'smtp.gmail.com'
+
+const createTransporter = async () => {
+  const { address } = await dns.promises.lookup(gmailSmtpHost, { family: 4 })
+
+  return nodemailer.createTransport({
+    host: address,
+    port: 465,
+    secure: true,
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 30_000,
+    tls: {
+      servername: gmailSmtpHost
+    },
+    auth: {
+      type: 'OAuth2',
+      user: env.emailUser,
+      clientId: env.emailClientId,
+      clientSecret: env.emailClientSecret,
+      accessToken: env.emailAccessToken,
+      refreshToken: env.emailRefreshToken
+    }
+  })
+}
+
+const transporterPromise = missingEmailEnvVars.length
   ? null
-  : nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      family: 4,
-      connectionTimeout: 30_000,
-      greetingTimeout: 30_000,
-      socketTimeout: 30_000,
-      auth: {
-        type: 'OAuth2',
-        user: env.emailUser,
-        clientId: env.emailClientId,
-        clientSecret: env.emailClientSecret,
-        accessToken: env.emailAccessToken,
-        refreshToken: env.emailRefreshToken
-      }
-    })
+  : createTransporter()
 
 const getEmailTransportErrorMessage = (error) => {
   if (!error) {
@@ -57,23 +67,26 @@ if (missingEmailEnvVars.length) {
     `Email service is disabled. Missing env vars: ${missingEmailEnvVars.join(', ')}`
   )
 } else {
-  transporter.verify((error) => {
+  transporterPromise.then((transporter) => transporter.verify((error) => {
     if (error) {
       console.error('Error connecting to email server:', getEmailTransportErrorMessage(error))
     } else {
       console.log('Email server is ready to send messages')
     }
+  })).catch((error) => {
+    console.error('Error connecting to email server:', getEmailTransportErrorMessage(error))
   })
 }
 
 const sendEmail = async (to, subject, text, html, attachments = []) => {
-  if (!transporter) {
+  if (!transporterPromise) {
     throw new Error(
       `Email transport is not configured. Missing env vars: ${missingEmailEnvVars.join(', ')}`
     )
   }
 
   try {
+    const transporter = await transporterPromise
     const info = await transporter.sendMail({
       from: `"Buy Best" <${env.emailUser}>`,
       to,
