@@ -20,6 +20,7 @@ type UseCartCheckoutOptions = {
       total: number
     }
   }) => string
+  onCheckoutSuccess?: (response: any) => void
 }
 
 export function useCartCheckout({
@@ -27,6 +28,7 @@ export function useCartCheckout({
   createOnlineCheckoutSession,
   onBeforeCheckout,
   getSuccessMessage,
+  onCheckoutSuccess,
 }: UseCartCheckoutOptions) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState("credit_card")
@@ -52,6 +54,9 @@ export function useCartCheckout({
             ? getSuccessMessage(response)
             : `${response.message} Total payable: ${formatPrice(response.summary.total)}`
         )
+        if (onCheckoutSuccess) {
+          onCheckoutSuccess(response)
+        }
         return
       }
 

@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   ArrowLeft,
+  Clock,
+  CheckCircle2,
   CreditCard,
+  Package,
   ShoppingCart,
   TriangleAlert,
+  Truck,
   X,
 } from "lucide-react"
 
@@ -32,9 +36,17 @@ type CheckoutPageProps = {
   currentUser?: AuthUser | null
 }
 
+type PlacedOrderDetails = {
+  items: any[]
+  total: number
+  placedAt: number
+}
+
 const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
   const dispatch = useAppShellDispatch()
   const [isLoginAlertOpen, setIsLoginAlertOpen] = useState(false)
+  const [placedOrderDetails, setPlacedOrderDetails] = useState<PlacedOrderDetails | null>(null)
+  const [deliveryStatus, setDeliveryStatus] = useState("processing")
   const [couponCode, setCouponCode] = useState("")
   const [couponFeedback, setCouponFeedback] = useState("")
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null)
@@ -87,6 +99,13 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
 
       return `${response.message} Total payable: ${payableLabel}`
     },
+    onCheckoutSuccess: (response) => {
+      setPlacedOrderDetails({
+        items: response.items || [],
+        total: response.summary?.total || 0,
+        placedAt: Date.now()
+      })
+    }
   })
 
   useEffect(() => {
@@ -96,6 +115,17 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
 
     if (stripeStatus === "cancelled") {
       setCheckoutMessage("Stripe checkout was cancelled. Your cart is still waiting for you.")
+      
+      if (sessionId) {
+        import("axios").then((axios) => {
+          axios.default.post(
+            `${import.meta.env.VITE_API_BASE_URL || "http://localhost:4000"}/api/payment/cancel-session/${sessionId}`,
+            {},
+            { withCredentials: true }
+          ).catch(console.error)
+        })
+      }
+
       window.history.replaceState({}, "", "/checkout")
       return
     }
@@ -129,6 +159,18 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
           setCouponFeedback("")
           await refreshCart()
           setCheckoutMessage("Payment confirmed and your order has been placed successfully.")
+          
+          if (latestStatus.orders && latestStatus.orders.length > 0) {
+            setPlacedOrderDetails({
+              items: latestStatus.orders.map(o => ({
+                name: o.productDetails?.name || "Product",
+                quantity: o.quantity,
+                price: o.total || o.subToatl || 0
+              })),
+              total: latestStatus.orders.reduce((acc, o) => acc + (o.total || o.subToatl || 0), 0),
+              placedAt: Date.now()
+            })
+          }
         } else {
           setCheckoutMessage("Stripe returned you to checkout, but payment is still processing.")
         }
@@ -145,6 +187,23 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
 
     void verifyStripeCheckout()
   }, [clearCartState, currentUser, refreshCart, setCheckoutMessage])
+
+  useEffect(() => {
+    if (!placedOrderDetails) return
+    
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - placedOrderDetails.placedAt
+      if (elapsed > 10 * 60 * 1000) {
+        setDeliveryStatus("delivered")
+      } else if (elapsed > 2 * 60 * 1000) {
+        setDeliveryStatus("on_the_way")
+      } else {
+        setDeliveryStatus("processing")
+      }
+    }, 1000)
+    
+    return () => clearInterval(interval)
+  }, [placedOrderDetails])
 
   useEffect(() => {
     const loadCoupons = async () => {
@@ -262,23 +321,102 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     )
   }
 
-  if (cartItems.length === 0 && checkoutMessage) {
+  if (placedOrderDetails) {
     return (
-      <div className="mx-auto max-w-4xl rounded-[30px] bg-white/80 p-6 text-center shadow-sm sm:p-8">
-        <h1 className="text-2xl font-bold text-[#123c31] sm:text-3xl">Order update</h1>
-        <p className="mt-3 text-[#648176]">{checkoutMessage}</p>
-        <Button
-          type="button"
-          className="mt-6 rounded-2xl bg-[#0d7a45] hover:bg-[#0a6539]"
-          onClick={() => dispatch(appShellActions.openShop())}
-        >
-          Continue shopping
-        </Button>
-      </div>
-    )
-  }
+      <div className="mx-auto max-w-4xl rounded-[30px] bg-white/80 p-6 shadow-sm sm:p-8">
+        <div className="text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#dcfce7] text-[#166534]">
+            <CheckCircle2 className="h-8 w-8" />
+          </div>
+          <h1 className="mt-4 text-2xl font-bold text-[#123c31] sm:text-3xl">Order Confirmed!</h1>
+          <p className="mt-2 text-[#648176]">{checkoutMessage}</p>
+        </div>
 
+          <div className="mt-10 rounded-2xl border border-[#e2e8f0] bg-white p-6">
+            <h2 className="text-lg font-semibold text-[#1e293b]">Delivery Status</h2>
+            <div className="mt-6 relative">
+              <div className="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-[#f1f5f9]"></div>
+              <div 
+                className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#10b981] transition-all duration-1000"
+                style={{ 
+                  width: deliveryStatus === 'delivered' ? '100%' : deliveryStatus === 'on_the_way' ? '50%' : '0%' 
+                }}
+              ></div>
+              
+              <div className="relative flex justify-between">
+                <div className="flex flex-col items-center gap-2 bg-white px-2">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${deliveryStatus === 'processing' || deliveryStatus === 'on_the_way' || deliveryStatus === 'delivered' ? 'bg-[#10b981] text-white' : 'bg-[#e2e8f0] text-[#94a3b8]'}`}>
+                    <Package className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-medium text-[#334155]">Processing</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 bg-white px-2">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${deliveryStatus === 'on_the_way' || deliveryStatus === 'delivered' ? 'bg-[#10b981] text-white' : 'bg-[#e2e8f0] text-[#94a3b8]'}`}>
+                    <Truck className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-medium text-[#334155]">On the Way</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 bg-white px-2">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${deliveryStatus === 'delivered' ? 'bg-[#10b981] text-white' : 'bg-[#e2e8f0] text-[#94a3b8]'}`}>
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <span className="text-sm font-medium text-[#334155]">Delivered</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8 flex items-center justify-center gap-2 rounded-lg bg-[#f8fafc] p-3 text-[#475569]">
+              <Clock className="h-5 w-5 text-[#3b82f6]" />
+              <span className="text-sm font-medium">
+                {deliveryStatus === 'delivered' 
+                  ? "Your order has been delivered successfully!" 
+                  : "Estimated delivery in 10-15 minutes."}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-2xl border border-[#e2e8f0] bg-white p-6">
+            <h2 className="mb-4 text-lg font-semibold text-[#1e293b]">Order Summary</h2>
+            <div className="divide-y divide-[#f1f5f9]">
+              {placedOrderDetails.items.map((item, idx) => (
+                <div key={idx} className="flex justify-between py-3 text-sm">
+                  <span className="text-[#475569]">{item.name} <span className="text-[#94a3b8]">x{item.quantity}</span></span>
+                  <span className="font-medium text-[#1e293b]">{formatPrice(item.price || item.totalPrice || 0)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-between border-t border-[#e2e8f0] pt-4 font-semibold">
+              <span className="text-[#1e293b]">Total Paid</span>
+              <span className="text-[#16a34a]">{formatPrice(placedOrderDetails.total)}</span>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <Button
+              type="button"
+              className="rounded-2xl bg-[#0d7a45] hover:bg-[#0a6539]"
+              onClick={() => dispatch(appShellActions.openShop())}
+            >
+              Continue shopping
+            </Button>
+          </div>
   if (cartItems.length === 0) {
+    if (checkoutMessage) {
+      return (
+        <div className="mx-auto max-w-4xl rounded-[30px] bg-white/80 p-6 text-center shadow-sm sm:p-8">
+          <h1 className="text-2xl font-bold text-[#123c31] sm:text-3xl">Order update</h1>
+          <p className="mt-3 text-[#648176]">{checkoutMessage}</p>
+          <Button
+            type="button"
+            className="mt-6 rounded-2xl bg-[#0d7a45] hover:bg-[#0a6539]"
+            onClick={() => dispatch(appShellActions.openShop())}
+          >
+            Continue shopping
+          </Button>
+        </div>
+      )
+    }
+
     return (
       <div className="mx-auto max-w-4xl rounded-[30px] bg-white/75 p-6 text-center shadow-sm sm:p-8">
         <h1 className="text-2xl font-bold text-[#123c31] sm:text-3xl">Your cart is empty</h1>

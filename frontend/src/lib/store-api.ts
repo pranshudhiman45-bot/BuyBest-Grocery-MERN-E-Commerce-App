@@ -57,6 +57,7 @@ export type StripeCheckoutStatusResponse = {
   sessionId: string
   status: string
   paymentStatus: string
+  orders?: any[]
 }
 
 export type Address = {

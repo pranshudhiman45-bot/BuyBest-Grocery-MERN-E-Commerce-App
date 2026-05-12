@@ -9,7 +9,8 @@ const {
   createStripeCheckoutSession,
   finalizeStripeSessionOrders,
   getStripeSessionStatus,
-  markStripeSessionOrdersFailed
+  markStripeSessionOrdersFailed,
+  cancelStripeSessionOrders
 } = require('../services/checkout.service.js')
 
 const router = express.Router()
@@ -92,8 +93,10 @@ router.get('/session-status/:sessionId', asyncHandler(async (req, res) => {
     throw new AppError('This Stripe session does not belong to the current user', 403)
   }
 
+  let orders = []
+
   if (session.payment_status === 'paid') {
-    await finalizeStripeSessionOrders(session.id)
+    orders = await finalizeStripeSessionOrders(session.id)
   } else if (session.status === 'expired') {
     await markStripeSessionOrdersFailed(session.id)
   }
@@ -101,8 +104,21 @@ router.get('/session-status/:sessionId', asyncHandler(async (req, res) => {
   res.status(200).json({
     sessionId: session.id,
     status: session.status,
-    paymentStatus: session.payment_status
+    paymentStatus: session.payment_status,
+    orders
   })
+}))
+
+router.post('/cancel-session/:sessionId', asyncHandler(async (req, res) => {
+  const { sessionId } = req.params
+
+  if (!sessionId) {
+    throw new AppError('Session ID is required', 400)
+  }
+
+  await cancelStripeSessionOrders(sessionId)
+
+  res.status(200).json({ message: 'Cancelled session orders deleted' })
 }))
 
 module.exports = router

@@ -54,22 +54,7 @@ const gmailSmtpHost = 'smtp.gmail.com'
 const gmailSmtpPort = 465
 
 const logEmailDebug = (message, details = {}) => {
-  console.log('[email debug]', message, {
-    smtpHost: gmailSmtpHost,
-    smtpPort: gmailSmtpPort,
-    emailProvider,
-    configuredEmailProvider,
-    defaultEmailProvider,
-    isRender: Boolean(env.isRender),
-    nodeEnv: env.nodeEnv,
-    emailUserConfigured: Boolean(env.emailUser),
-    emailFromConfigured: Boolean(env.emailFrom),
-    emailClientIdConfigured: Boolean(env.emailClientId),
-    emailClientSecretConfigured: Boolean(env.emailClientSecret),
-    emailRefreshTokenConfigured: Boolean(env.emailRefreshToken),
-    emailAccessTokenConfigured: Boolean(env.emailAccessToken),
-    ...details
-  })
+  // Debug logs removed
 }
 
 const getEmailErrorDebugDetails = (error) => {
@@ -155,11 +140,7 @@ if (!isSupportedEmailProvider) {
 } else {
   logEmailDebug('Email service configuration loaded')
   if (env.isRender || env.nodeEnv === 'production') {
-    console.warn(
-      '[email debug] SMTP provider is enabled in production/Render. ' +
-      'If this service runs on Render free, outbound SMTP ports can timeout. ' +
-      'Set EMAIL_PROVIDER=gmail-api to send through HTTPS.'
-    )
+    // Warning removed
   }
   transporterPromise.then((transporter) => transporter.verify((error) => {
     if (error) {

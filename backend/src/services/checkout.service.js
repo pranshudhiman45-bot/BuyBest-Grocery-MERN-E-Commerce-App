@@ -409,7 +409,7 @@ const createStripeCheckoutSession = async (
     payment_method_types: paymentMethod === 'upi' ? ['upi'] : ['card'],
     line_items: buildStripeLineItems(context),
     success_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=cancelled`,
+    cancel_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=cancelled&session_id={CHECKOUT_SESSION_ID}`,
     customer_email: user.email,
     metadata: {
       userId: user._id.toString(),
@@ -516,6 +516,13 @@ const markStripeSessionOrdersFailed = async (sessionId) => {
   )
 }
 
+const cancelStripeSessionOrders = async (sessionId) => {
+  await orderModel.deleteMany({
+    paymentId: sessionId,
+    paymentStatus: 'pending'
+  })
+}
+
 const getStripeSessionStatus = async (sessionId) => {
   const stripeClient = ensureStripeConfigured()
   return stripeClient.checkout.sessions.retrieve(sessionId)
@@ -535,5 +542,6 @@ module.exports = {
   createStripeCheckoutSession,
   finalizeStripeSessionOrders,
   markStripeSessionOrdersFailed,
+  cancelStripeSessionOrders,
   getStripeSessionStatus
 }
