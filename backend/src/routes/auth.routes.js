@@ -26,4 +26,5 @@ router.post('/logout', authRateLimit, authController.logoutUser)
 router.post('/avatar', authMiddleware,avatarUpload.single('avatar'),authController.uploadAvatar)
 router.put("/update-user", authMiddleware, authController.updateUserProfile);
 router.post("/verify-new-email", authMiddleware, authController.verifyNewEmail);
+router.post("/verify-new-password", authMiddleware, authController.verifyNewPassword);
 module.exports = router

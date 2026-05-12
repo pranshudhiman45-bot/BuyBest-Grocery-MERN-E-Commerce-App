@@ -506,8 +506,22 @@ const updateUserProfile = async (user, body) => {
 
     if (name) user.name = name;
     if (mobile) user.mobile = mobile;
-    if (password) user.password = password;
-      if (email && email !== user.email) {
+    
+    let passwordOtpSent = false;
+    if (password) {
+      const otp = generateOtp();
+      user.passwordVerifyOtp = hashOtp(otp);
+      user.passwordVerifyOtpExpire = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000);
+      await emailService.sendVerificationOtpEmail(
+        user.email,
+        user.name,
+        otp,
+        env.otpExpiryMinutes
+      );
+      passwordOtpSent = true;
+    }
+
+    if (email && email !== user.email) {
       const emailExists = await userModel.findOne({ email });
       if (emailExists) {
         return {
@@ -535,7 +549,9 @@ const updateUserProfile = async (user, body) => {
     return {
       statusCode: 200,
       body: {
-        message: user.pendingEmail ? "Email verification OTP sent to your new email" : "Profile updated successfully",
+        message: user.pendingEmail || passwordOtpSent ? "Verification OTP(s) sent to your email" : "Profile updated successfully",
+        requiresEmailOtp: !!user.pendingEmail,
+        requiresPasswordOtp: passwordOtpSent,
         user: buildUserResponse(user),
         success: true
       }
@@ -594,6 +610,47 @@ const verifyNewEmail = async (user, body) => {
   };
 };
 
+const verifyNewPassword = async (user, body) => {
+  const { otp, newPassword } = body;
+
+  if (!user || !user.passwordVerifyOtp) {
+    return {
+      statusCode: 400,
+      body: {
+        message: "No password change requested",
+        success: false
+      }
+    };
+  }
+
+  if (
+    user.passwordVerifyOtp !== hashOtp(otp) ||
+    user.passwordVerifyOtpExpire < Date.now()
+  ) {
+    return {
+      statusCode: 400,
+      body: {
+        message: "Invalid or expired OTP",
+        success: false
+      }
+    };
+  }
+
+  user.password = newPassword;
+  user.passwordVerifyOtp = undefined;
+  user.passwordVerifyOtpExpire = undefined;
+
+  await user.save();
+
+  return {
+    statusCode: 200,
+    body: {
+      message: "Password updated successfully",
+      success: true
+    }
+  };
+};
+
 module.exports = {
   registerUser,
   getCurrentUser,
@@ -607,5 +664,6 @@ module.exports = {
   logoutUser,
   uploadAvatar,
   updateUserProfile,
-  verifyNewEmail
+  verifyNewEmail,
+  verifyNewPassword
 }

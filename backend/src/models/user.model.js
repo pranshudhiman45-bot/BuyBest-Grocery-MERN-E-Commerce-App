@@ -24,6 +24,12 @@ const userSchema = new mongoose.Schema(
     emailVerifyOtpExpire: {
       type: Date
     },
+    passwordVerifyOtp: {
+      type: String
+    },
+    passwordVerifyOtpExpire: {
+      type: Date
+    },
     name: {
       type: String,
       required: [true, 'Please provide name']

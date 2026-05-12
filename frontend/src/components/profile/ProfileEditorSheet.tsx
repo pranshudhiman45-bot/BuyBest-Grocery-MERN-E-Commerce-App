@@ -7,6 +7,7 @@ import {
   updateUserProfile,
   uploadAvatar,
   verifyNewEmailOtp,
+  verifyNewPasswordOtp,
   type AuthUser,
 } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -49,12 +50,15 @@ export function ProfileEditorSheet({
   const [mobile, setMobile] = React.useState(user.mobile || "")
   const [password, setPassword] = React.useState("")
   const [emailOtp, setEmailOtp] = React.useState("")
+  const [passwordOtp, setPasswordOtp] = React.useState("")
   const [feedback, setFeedback] = React.useState("")
   const [error, setError] = React.useState("")
   const [isSaving, setIsSaving] = React.useState(false)
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false)
   const [isVerifyingEmail, setIsVerifyingEmail] = React.useState(false)
+  const [isVerifyingPassword, setIsVerifyingPassword] = React.useState(false)
   const [isAwaitingEmailVerification, setIsAwaitingEmailVerification] = React.useState(false)
+  const [isAwaitingPasswordVerification, setIsAwaitingPasswordVerification] = React.useState(false)
   const [popupState, setPopupState] = React.useState<{
     title: string
     message: string
@@ -125,11 +129,17 @@ export function ProfileEditorSheet({
 
       storeAuthUser(response.user)
       onUserUpdate(response.user)
-      setPassword("")
-      const waitingForEmailOtp = response.message.toLowerCase().includes("verification otp sent")
+      
+      const waitingForEmailOtp = !!response.requiresEmailOtp
+      const waitingForPasswordOtp = !!response.requiresPasswordOtp
+      
       setIsAwaitingEmailVerification(waitingForEmailOtp)
-      setFeedback(waitingForEmailOtp ? response.message : "")
-      if (!waitingForEmailOtp) {
+      setIsAwaitingPasswordVerification(waitingForPasswordOtp)
+      
+      if (waitingForEmailOtp || waitingForPasswordOtp) {
+        setFeedback(response.message)
+      } else {
+        setPassword("")
         setPopupState({
           title: "Profile updated",
           message: "Profile edited successfully.",
@@ -182,6 +192,38 @@ export function ProfileEditorSheet({
     }
   }
 
+  const handleVerifyNewPassword = async () => {
+    setIsVerifyingPassword(true)
+    setError("")
+    setFeedback("")
+    setPopupState(null)
+
+    try {
+      await verifyNewPasswordOtp(passwordOtp.trim(), password.trim())
+      setPassword("")
+      setPasswordOtp("")
+      setIsAwaitingPasswordVerification(false)
+      setFeedback("")
+      setPopupState({
+        title: "Password updated",
+        message: "Your password changed successfully.",
+        tone: "success",
+      })
+    } catch (verifyError) {
+      const message =
+        verifyError instanceof Error ? verifyError.message : "Unable to verify your new password."
+      setError(message)
+      setPopupState({
+        title: "Password update failed",
+        message,
+        tone: "error",
+      })
+    } finally {
+      setIsVerifyingPassword(false)
+    }
+  }
+
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -212,7 +254,7 @@ export function ProfileEditorSheet({
           ) : null}
 
           <Card className="rounded-[26px] border border-[#ece4d6] bg-white/90 py-0 shadow-[0_18px_44px_rgba(78,62,31,0.08)]">
-            <CardHeader className="border-b border-[#efe4d1]">
+          <CardHeader className="rounded-t-[26px] border-b border-[#efe4d1] bg-[#fffaf3] px-6 py-5">
               <CardTitle className="text-[#2c2417]">Profile photo</CardTitle>
               <CardDescription className="text-[#7d6d52]">
                 Upload a profile image that will show in the navbar and account menu.
@@ -354,6 +396,38 @@ export function ProfileEditorSheet({
                 >
                   <MailCheck className="h-4 w-4" />
                   {isVerifyingEmail ? "Verifying..." : "Verify new email"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isAwaitingPasswordVerification ? (
+            <Card className="rounded-[26px] border border-[#ece4d6] bg-white/90 py-0 shadow-[0_18px_44px_rgba(78,62,31,0.08)]">
+              <CardHeader className="border-b border-[#efe4d1]">
+                <CardTitle className="text-[#2c2417]">Verify new password</CardTitle>
+                <CardDescription className="text-[#7d6d52]">
+                  Enter the OTP sent to your email address to confirm the password change.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 py-6">
+                <Field>
+                  <FieldLabel htmlFor="password-otp">Password OTP</FieldLabel>
+                  <Input
+                    id="password-otp"
+                    value={passwordOtp}
+                    onChange={(event) => setPasswordOtp(event.target.value)}
+                    className="h-12 rounded-2xl border-[#e6dcc9] bg-[#fbf8f2] text-[#2c2417]"
+                    placeholder="Enter OTP"
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  className="h-12 rounded-2xl bg-[#624c11] text-white hover:bg-[#4f3d0c]"
+                  disabled={isVerifyingPassword}
+                  onClick={() => void handleVerifyNewPassword()}
+                >
+                  <MailCheck className="h-4 w-4" />
+                  {isVerifyingPassword ? "Verifying..." : "Verify new password"}
                 </Button>
               </CardContent>
             </Card>

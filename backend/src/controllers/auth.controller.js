@@ -197,6 +197,10 @@ const verifyNewEmail = asyncHandler(async (req, res) => {
   const response = await authService.verifyNewEmail(req.user, req.body);
   res.status(response.statusCode).json(response.body);
 });
+const verifyNewPassword = asyncHandler(async (req, res) => {
+  const response = await authService.verifyNewPassword(req.user, req.body);
+  res.status(response.statusCode).json(response.body);
+});
 module.exports = {
   startGoogleAuth,
   completeGoogleAuth,
@@ -213,5 +217,6 @@ module.exports = {
   logoutUser,
   uploadAvatar,
   updateUserProfile,
-  verifyNewEmail
+  verifyNewEmail,
+  verifyNewPassword
 }

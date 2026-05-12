@@ -71,7 +71,7 @@ const Footer = ({ currentUser = null }: FooterProps) => {
             type="button"
             aria-label="Email support"
             onClick={() => {
-              window.location.href = "mailto:support@buybest.com"
+              window.location.href = "mailto:pranshudhiman90@gmail.com"
             }}
             className="cursor-pointer hover:text-black transition"
           >

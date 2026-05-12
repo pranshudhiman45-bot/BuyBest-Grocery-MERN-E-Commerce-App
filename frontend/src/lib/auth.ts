@@ -22,6 +22,8 @@ export type ProfileUpdateResponse = {
   message: string
   user: AuthUser
   success: boolean
+  requiresEmailOtp?: boolean
+  requiresPasswordOtp?: boolean
 }
 
 export type VerifyNewEmailResponse = {
@@ -303,3 +305,13 @@ export async function verifyNewEmailOtp(otp: string) {
     throw new Error(getApiErrorMessage(error, "Unable to verify your new email."))
   }
 }
+
+export async function verifyNewPasswordOtp(otp: string, newPassword: string) {
+  try {
+    const response = await authApi.post<{ message: string; success: boolean }>("/api/auth/verify-new-password", { otp, newPassword })
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to verify your new password."))
+  }
+}
+
