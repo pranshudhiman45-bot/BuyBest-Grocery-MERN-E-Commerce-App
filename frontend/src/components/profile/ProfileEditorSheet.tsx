@@ -251,7 +251,7 @@ export function ProfileEditorSheet({
           </Card>
 
           <Card className="rounded-[26px] border border-[#ece4d6] bg-white/90 py-0 shadow-[0_18px_44px_rgba(78,62,31,0.08)]">
-            <CardHeader className="border-b border-[#efe4d1]">
+           <CardHeader className="rounded-t-[26px] border-b border-[#efe4d1] bg-[#fffaf3] px-6 py-5">
               <CardTitle className="text-[#2c2417]">Personal details</CardTitle>
               <CardDescription className="text-[#7d6d52]">
                 Change your name, phone, email, or password. Email changes require OTP confirmation.
