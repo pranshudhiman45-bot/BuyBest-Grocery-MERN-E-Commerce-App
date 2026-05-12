@@ -8,11 +8,8 @@ dns.setDefaultResultOrder('ipv4first')
 const defaultEmailProvider =
   env.isRender || env.nodeEnv === 'production'
     ? 'gmail-api'
-  : env.resendApiKey
-    ? 'resend'
     : 'smtp'
 const emailProvider = (env.emailProvider || defaultEmailProvider).toLowerCase()
-const usesResend = emailProvider === 'resend'
 const usesSmtp = emailProvider === 'smtp'
 const usesGmailApi = emailProvider === 'gmail-api'
 
@@ -23,11 +20,6 @@ const requiredSmtpEnvVars = [
   ['EMAIL_REFRESH_TOKEN (or REFRESH_TOKEN / REFESH_TOKEN)', env.emailRefreshToken]
 ]
 
-const requiredResendEnvVars = [
-  ['RESEND_API_KEY', env.resendApiKey],
-  ['EMAIL_FROM (or RESEND_FROM_EMAIL)', env.emailFrom]
-]
-
 const requiredGmailApiEnvVars = [
   ['EMAIL_USER', env.emailUser],
   ['EMAIL_CLIENT_ID (or CLIENT_ID)', env.emailClientId],
@@ -35,11 +27,9 @@ const requiredGmailApiEnvVars = [
   ['EMAIL_REFRESH_TOKEN (or REFRESH_TOKEN / REFESH_TOKEN)', env.emailRefreshToken]
 ]
 
-const requiredEmailEnvVars = usesResend
-  ? requiredResendEnvVars
-  : usesGmailApi
-    ? requiredGmailApiEnvVars
-    : requiredSmtpEnvVars
+const requiredEmailEnvVars = usesGmailApi
+  ? requiredGmailApiEnvVars
+  : requiredSmtpEnvVars
 
 const missingEmailEnvVars = requiredEmailEnvVars
   .filter(([, value]) => !value)
@@ -62,7 +52,6 @@ const logEmailDebug = (message, details = {}) => {
     emailClientSecretConfigured: Boolean(env.emailClientSecret),
     emailRefreshTokenConfigured: Boolean(env.emailRefreshToken),
     emailAccessTokenConfigured: Boolean(env.emailAccessToken),
-    resendApiKeyConfigured: Boolean(env.resendApiKey),
     ...details
   })
 }
@@ -125,17 +114,6 @@ const getEmailTransportErrorMessage = (error) => {
 
   const errorMessage = error.message || String(error)
 
-  if (
-    usesResend &&
-    /verify a domain|testing emails|own email address|resend\.com\/domains/i.test(errorMessage)
-  ) {
-    return [
-      'Resend is in testing mode for this sender.',
-      'With EMAIL_FROM=Buy Best <onboarding@resend.dev>, OTP emails can only be sent to the email address registered on your Resend account.',
-      'To send OTPs to other users, verify your own domain in Resend and set EMAIL_FROM to an address on that domain.'
-    ].join(' ')
-  }
-
   if (error.code === 'EAUTH' && String(error.message || '').includes('invalid_grant')) {
     return [
       'Google rejected the Gmail OAuth refresh token (`invalid_grant`).',
@@ -147,9 +125,9 @@ const getEmailTransportErrorMessage = (error) => {
   return errorMessage
 }
 
-if (!usesResend && !usesSmtp && !usesGmailApi) {
+if (!usesSmtp && !usesGmailApi) {
   console.error(
-    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${emailProvider}. Use "gmail-api", "resend", or "smtp".`
+    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${emailProvider}. Use "gmail-api" or "smtp".`
   )
 } else if (missingEmailEnvVars.length) {
   console.error(
@@ -158,16 +136,13 @@ if (!usesResend && !usesSmtp && !usesGmailApi) {
 } else if (usesGmailApi) {
   logEmailDebug('Gmail API configuration loaded')
   console.log('Email server is ready to send messages through Gmail API')
-} else if (usesResend) {
-  logEmailDebug('Resend email API configuration loaded')
-  console.log('Email server is ready to send messages through Resend API')
 } else {
   logEmailDebug('Email service configuration loaded')
   if (env.isRender || env.nodeEnv === 'production') {
     console.warn(
       '[email debug] SMTP provider is enabled in production/Render. ' +
       'If this service runs on Render free, outbound SMTP ports can timeout. ' +
-      'Set EMAIL_PROVIDER=resend with RESEND_API_KEY and EMAIL_FROM.'
+      'Set EMAIL_PROVIDER=gmail-api to send through HTTPS.'
     )
   }
   transporterPromise.then((transporter) => transporter.verify((error) => {
@@ -304,51 +279,6 @@ const sendGmailApiEmail = async (to, subject, text, html, attachments = []) => {
   return responseBody
 }
 
-const sendResendEmail = async (to, subject, text, html, attachments = []) => {
-  logEmailDebug('Sending email through Resend API', {
-    to,
-    subject,
-    attachmentCount: attachments.length
-  })
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.resendApiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: env.emailFrom,
-      to: [to],
-      subject,
-      text,
-      html
-    })
-  })
-
-  const responseBody = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    logEmailDebug('Resend API send failed', {
-      status: response.status,
-      statusText: response.statusText,
-      response: responseBody
-    })
-
-    throw new Error(
-      responseBody?.message ||
-      responseBody?.error ||
-      `Resend API failed with status ${response.status}`
-    )
-  }
-
-  logEmailDebug('Resend API email sent', {
-    id: responseBody?.id
-  })
-
-  return responseBody
-}
-
 const sendSmtpEmail = async (to, subject, text, html, attachments = []) => {
   const transporter = await transporterPromise
   logEmailDebug('Sending email through SMTP', {
@@ -376,7 +306,7 @@ const sendSmtpEmail = async (to, subject, text, html, attachments = []) => {
 }
 
 const sendEmail = async (to, subject, text, html, attachments = []) => {
-  if (missingEmailEnvVars.length || (!usesResend && !usesGmailApi && !transporterPromise)) {
+  if (missingEmailEnvVars.length || (!usesGmailApi && !transporterPromise)) {
     throw new Error(
       `Email transport is not configured. Missing env vars: ${missingEmailEnvVars.join(', ')}`
     )
@@ -387,9 +317,7 @@ const sendEmail = async (to, subject, text, html, attachments = []) => {
       return sendGmailApiEmail(to, subject, text, html, attachments)
     }
 
-    return usesResend
-      ? sendResendEmail(to, subject, text, html, attachments)
-      : sendSmtpEmail(to, subject, text, html, attachments)
+    return sendSmtpEmail(to, subject, text, html, attachments)
   } catch (error) {
     logEmailDebug('Email send failed', getEmailErrorDebugDetails(error))
     throw new Error(getEmailTransportErrorMessage(error))

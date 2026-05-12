@@ -165,8 +165,8 @@ If webhook delivery is missing, payment completion state can drift from the actu
 ## Operational Notes
 
 - `CORS_ORIGIN` accepts a comma-separated list and is parsed into the allowed origin list.
-- On Render free instances, use an HTTPS email API path instead of Gmail SMTP.
-  For this learning project, set `EMAIL_PROVIDER=gmail-api` and keep the existing
+- On Render free instances, use Gmail API over HTTPS instead of Gmail SMTP.
+  Set `EMAIL_PROVIDER=gmail-api` and keep the existing
   Google OAuth email env vars: `EMAIL_USER`, `EMAIL_CLIENT_ID`, `EMAIL_CLIENT_SECRET`,
   and `EMAIL_REFRESH_TOKEN`.
   Gmail SMTP ports `465`/`587` may be blocked in production even when they work locally.

@@ -70,11 +70,7 @@ module.exports = {
     process.env.REFESH_TOKEN,
   emailUser: process.env.EMAIL_USER,
   emailProvider: process.env.EMAIL_PROVIDER,
-  emailFrom:
-    process.env.EMAIL_FROM ||
-    process.env.RESEND_FROM_EMAIL ||
-    process.env.EMAIL_USER,
-  resendApiKey: process.env.RESEND_API_KEY,
+  emailFrom: process.env.EMAIL_FROM || process.env.EMAIL_USER,
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
