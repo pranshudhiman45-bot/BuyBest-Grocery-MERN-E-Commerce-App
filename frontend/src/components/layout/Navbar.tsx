@@ -205,10 +205,12 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
   }, [debounced, searchProducts])
 
   const handleSelectProduct = (product: Product) => {
-    setValue(product.name)
+    setValue("")
     setFiltered([])
     setActiveIndex(-1)
-    dispatch(appShellActions.openProduct(product.id))
+    setLoading(false)
+
+   dispatch(appShellActions.openProduct(product.id))
   }
 
   const handleLogoutConfirm = async () => {
@@ -335,7 +337,10 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                           itemIndex === activeIndex ? "bg-[#faf4e8]" : "hover:bg-[#fcf8ef]"
                         }`}
                         onMouseEnter={() => setActiveIndex(itemIndex)}
-                        onClick={() => handleSelectProduct(item)}
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          handleSelectProduct(item)
+                        }}
                       >
                         <Search className="h-3 w-3 text-[#af9d7c]" />
                         <span className="flex flex-col">
@@ -626,7 +631,10 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                           itemIndex === activeIndex ? "bg-[#faf4e8]" : "hover:bg-[#fcf8ef]"
                         }`}
                         onMouseEnter={() => setActiveIndex(itemIndex)}
-                        onClick={() => handleSelectProduct(item)}
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          handleSelectProduct(item)
+                        }}
                       >
                         <Search className="h-3 w-3 text-[#af9d7c]" />
                         <span className="flex flex-col">
