@@ -37,7 +37,7 @@ type CheckoutPageProps = {
 }
 
 type PlacedOrderDetails = {
-  items: { name: string; quantity: number; price: number }[]
+  items: { name: string; quantity: number; price: number; totalPrice?: number }[]
   total: number
   placedAt: number
 }
