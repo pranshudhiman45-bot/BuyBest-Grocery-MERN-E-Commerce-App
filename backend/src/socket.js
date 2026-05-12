@@ -48,8 +48,12 @@ const setupSocket = (server) => {
   io = new Server(server, {
     cors: {
       origin: env.corsOrigins,
-      credentials: true
-    }
+      credentials: true,
+      methods: ['GET', 'POST']
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000
   })
 
   console.log(
@@ -68,13 +72,19 @@ const setupSocket = (server) => {
     try {
       const cookies = parseCookieHeader(socket.handshake.headers.cookie || '')
       const token = cookies[ACCESS_TOKEN_COOKIE_NAME]
+      const authToken = socket.handshake.auth?.token
+      const bearerToken = socket.handshake.headers?.authorization?.startsWith('Bearer ')
+        ? socket.handshake.headers.authorization.split(' ')[1]
+        : null
 
-      if (!token) {
+      const finalToken = token || authToken || bearerToken
+
+      if (!finalToken) {
         console.warn('Socket authentication rejected: missing access token')
         return next(new Error('Authentication required'))
       }
 
-      const decoded = jwt.verify(token, env.accessTokenSecret)
+      const decoded = jwt.verify(finalToken, env.accessTokenSecret)
       const user = await userModel.findById(decoded.userId)
 
       if (!user) {
@@ -99,7 +109,11 @@ const setupSocket = (server) => {
 
     socket.on('join_ticket', async (ticketId) => {
       try {
-        const ticket = await ticketModel.findById(ticketId).select('user')
+        if (!ticketId) {
+          return
+        }
+
+        const ticket = await ticketModel.findById(ticketId).select('user status')
 
         if (!ticket) {
           return
@@ -112,6 +126,7 @@ const setupSocket = (server) => {
           return
         }
 
+        socket.leave(ticketId)
         socket.join(ticketId)
         console.log(`Socket ${socket.id} joined ticket ${ticketId}`)
       } catch (error) {
@@ -121,6 +136,9 @@ const setupSocket = (server) => {
 
     socket.on('send_message', async (data) => {
       const { ticketId, text } = data || {}
+      if (!ticketId) {
+        return
+      }
       try {
         const ticket = await ticketModel.findById(ticketId)
         if (!ticket) return
@@ -149,7 +167,7 @@ const setupSocket = (server) => {
         await ticket.populate({
           path: 'messages.sender',
           select: 'name email role'
-            })
+        })
 
         const savedMessage = ticket.messages[ticket.messages.length - 1]
 
@@ -162,8 +180,8 @@ const setupSocket = (server) => {
       }
     })
 
-    socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`)
+    socket.on('disconnect', (reason) => {
+      console.log(`Socket disconnected: ${socket.id}, reason: ${reason}`)
     })
   })
 
