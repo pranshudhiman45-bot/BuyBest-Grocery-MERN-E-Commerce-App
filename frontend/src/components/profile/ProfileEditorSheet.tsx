@@ -228,7 +228,7 @@ export function ProfileEditorSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full overflow-y-auto border-l border-[#ece4d6] bg-[linear-gradient(180deg,#fffdf8_0%,#f8f5ee_100%)] p-0 sm:max-w-[560px]"
+        className="w-full overflow-y-auto border-l border-[#ece4d6] bg-[linear-gradient(180deg,#fffdf8_0%,#f8f5ee_100%)] p-0 sm:max-w-140"
       >
         <SheetHeader className="border-b border-[#ece4d6] px-6 py-5">
           <SheetTitle className="text-2xl text-[#2c2417]">Edit profile</SheetTitle>
@@ -436,7 +436,7 @@ export function ProfileEditorSheet({
       </SheetContent>
 
       {popupState ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#2c2417]/35 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-120 flex items-center justify-center bg-[#2c2417]/35 px-4 backdrop-blur-sm">
           <div
             className="absolute inset-0"
             onClick={() => setPopupState(null)}
