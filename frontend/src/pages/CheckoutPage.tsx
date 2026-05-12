@@ -37,7 +37,7 @@ type CheckoutPageProps = {
 }
 
 type PlacedOrderDetails = {
-  items: any[]
+  items: { name: string; quantity: number; price: number }[]
   total: number
   placedAt: number
 }
@@ -249,6 +249,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
       return
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAppliedCouponCode(null)
     setCouponFeedback(
       `${appliedCoupon.code} was removed because your cart total dropped below ${formatPrice(
@@ -400,6 +401,10 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
               Continue shopping
             </Button>
           </div>
+        </div>
+      )
+    }
+
   if (cartItems.length === 0) {
     if (checkoutMessage) {
       return (
