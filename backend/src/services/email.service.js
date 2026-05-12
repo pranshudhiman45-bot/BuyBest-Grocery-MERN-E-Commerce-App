@@ -9,9 +9,24 @@ const defaultEmailProvider =
   env.isRender || env.nodeEnv === 'production'
     ? 'gmail-api'
     : 'smtp'
-const emailProvider = (env.emailProvider || defaultEmailProvider).toLowerCase()
+const normalizeEmailProvider = (provider) => {
+  const normalizedProvider = String(provider || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[_\s]+/g, '-')
+
+  if (['gmail', 'google', 'google-auth', 'google-console', 'gmail-oauth'].includes(normalizedProvider)) {
+    return 'gmail-api'
+  }
+
+  return normalizedProvider
+}
+
+const configuredEmailProvider = env.emailProvider || defaultEmailProvider
+const emailProvider = normalizeEmailProvider(configuredEmailProvider)
 const usesSmtp = emailProvider === 'smtp'
 const usesGmailApi = emailProvider === 'gmail-api'
+const isSupportedEmailProvider = usesSmtp || usesGmailApi
 
 const requiredSmtpEnvVars = [
   ['EMAIL_USER', env.emailUser],
@@ -43,6 +58,7 @@ const logEmailDebug = (message, details = {}) => {
     smtpHost: gmailSmtpHost,
     smtpPort: gmailSmtpPort,
     emailProvider,
+    configuredEmailProvider,
     defaultEmailProvider,
     isRender: Boolean(env.isRender),
     nodeEnv: env.nodeEnv,
@@ -125,9 +141,9 @@ const getEmailTransportErrorMessage = (error) => {
   return errorMessage
 }
 
-if (!usesSmtp && !usesGmailApi) {
+if (!isSupportedEmailProvider) {
   console.error(
-    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${emailProvider}. Use "gmail-api" or "smtp".`
+    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${configuredEmailProvider}. Use "gmail-api" or "smtp".`
   )
 } else if (missingEmailEnvVars.length) {
   console.error(
@@ -306,6 +322,12 @@ const sendSmtpEmail = async (to, subject, text, html, attachments = []) => {
 }
 
 const sendEmail = async (to, subject, text, html, attachments = []) => {
+  if (!isSupportedEmailProvider) {
+    throw new Error(
+      `Email transport is not configured. Unsupported EMAIL_PROVIDER: ${configuredEmailProvider}. Use "gmail-api" for Render.`
+    )
+  }
+
   if (missingEmailEnvVars.length || (!usesGmailApi && !transporterPromise)) {
     throw new Error(
       `Email transport is not configured. Missing env vars: ${missingEmailEnvVars.join(', ')}`
