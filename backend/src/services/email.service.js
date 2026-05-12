@@ -6,12 +6,15 @@ const env = require('../config/env.js')
 dns.setDefaultResultOrder('ipv4first')
 
 const defaultEmailProvider =
-  env.resendApiKey || env.isRender || env.nodeEnv === 'production'
+  env.isRender || env.nodeEnv === 'production'
+    ? 'gmail-api'
+  : env.resendApiKey
     ? 'resend'
     : 'smtp'
 const emailProvider = (env.emailProvider || defaultEmailProvider).toLowerCase()
 const usesResend = emailProvider === 'resend'
 const usesSmtp = emailProvider === 'smtp'
+const usesGmailApi = emailProvider === 'gmail-api'
 
 const requiredSmtpEnvVars = [
   ['EMAIL_USER', env.emailUser],
@@ -25,7 +28,18 @@ const requiredResendEnvVars = [
   ['EMAIL_FROM (or RESEND_FROM_EMAIL)', env.emailFrom]
 ]
 
-const requiredEmailEnvVars = usesResend ? requiredResendEnvVars : requiredSmtpEnvVars
+const requiredGmailApiEnvVars = [
+  ['EMAIL_USER', env.emailUser],
+  ['EMAIL_CLIENT_ID (or CLIENT_ID)', env.emailClientId],
+  ['EMAIL_CLIENT_SECRET (or CLIENT_SECRET)', env.emailClientSecret],
+  ['EMAIL_REFRESH_TOKEN (or REFRESH_TOKEN / REFESH_TOKEN)', env.emailRefreshToken]
+]
+
+const requiredEmailEnvVars = usesResend
+  ? requiredResendEnvVars
+  : usesGmailApi
+    ? requiredGmailApiEnvVars
+    : requiredSmtpEnvVars
 
 const missingEmailEnvVars = requiredEmailEnvVars
   .filter(([, value]) => !value)
@@ -109,6 +123,19 @@ const getEmailTransportErrorMessage = (error) => {
     return 'Unknown email transport error'
   }
 
+  const errorMessage = error.message || String(error)
+
+  if (
+    usesResend &&
+    /verify a domain|testing emails|own email address|resend\.com\/domains/i.test(errorMessage)
+  ) {
+    return [
+      'Resend is in testing mode for this sender.',
+      'With EMAIL_FROM=Buy Best <onboarding@resend.dev>, OTP emails can only be sent to the email address registered on your Resend account.',
+      'To send OTPs to other users, verify your own domain in Resend and set EMAIL_FROM to an address on that domain.'
+    ].join(' ')
+  }
+
   if (error.code === 'EAUTH' && String(error.message || '').includes('invalid_grant')) {
     return [
       'Google rejected the Gmail OAuth refresh token (`invalid_grant`).',
@@ -117,17 +144,20 @@ const getEmailTransportErrorMessage = (error) => {
     ].join(' ')
   }
 
-  return error.message || String(error)
+  return errorMessage
 }
 
-if (!usesResend && !usesSmtp) {
+if (!usesResend && !usesSmtp && !usesGmailApi) {
   console.error(
-    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${emailProvider}. Use "resend" or "smtp".`
+    `Email service is disabled. Unsupported EMAIL_PROVIDER: ${emailProvider}. Use "gmail-api", "resend", or "smtp".`
   )
 } else if (missingEmailEnvVars.length) {
   console.error(
     `Email service is disabled. Missing env vars: ${missingEmailEnvVars.join(', ')}`
   )
+} else if (usesGmailApi) {
+  logEmailDebug('Gmail API configuration loaded')
+  console.log('Email server is ready to send messages through Gmail API')
 } else if (usesResend) {
   logEmailDebug('Resend email API configuration loaded')
   console.log('Email server is ready to send messages through Resend API')
@@ -152,6 +182,126 @@ if (!usesResend && !usesSmtp) {
     console.error('Error connecting to email server:', getEmailTransportErrorMessage(error))
     logEmailDebug('Transport initialization failed', getEmailErrorDebugDetails(error))
   })
+}
+
+const encodeBase64Url = (value) =>
+  Buffer.from(value)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+
+const sanitizeHeader = (value) =>
+  String(value || '').replace(/[\r\n]+/g, ' ').trim()
+
+const buildMimeMessage = ({ to, from, subject, text, html }) => {
+  const boundary = `buybest-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  return [
+    `From: ${sanitizeHeader(from)}`,
+    `To: ${sanitizeHeader(to)}`,
+    `Subject: ${sanitizeHeader(subject)}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 7bit',
+    '',
+    text,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 7bit',
+    '',
+    html,
+    '',
+    `--${boundary}--`
+  ].join('\r\n')
+}
+
+const getGmailApiAccessToken = async () => {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      client_id: env.emailClientId,
+      client_secret: env.emailClientSecret,
+      refresh_token: env.emailRefreshToken,
+      grant_type: 'refresh_token'
+    })
+  })
+
+  const responseBody = await response.json().catch(() => ({}))
+
+  if (!response.ok || !responseBody.access_token) {
+    logEmailDebug('Gmail API token refresh failed', {
+      status: response.status,
+      statusText: response.statusText,
+      response: responseBody
+    })
+
+    throw new Error(
+      responseBody?.error_description ||
+      responseBody?.error ||
+      `Gmail API token refresh failed with status ${response.status}`
+    )
+  }
+
+  return responseBody.access_token
+}
+
+const sendGmailApiEmail = async (to, subject, text, html, attachments = []) => {
+  logEmailDebug('Sending email through Gmail API', {
+    to,
+    subject,
+    attachmentCount: attachments.length
+  })
+
+  if (attachments.length) {
+    logEmailDebug('Gmail API provider ignores inline attachments', {
+      attachmentCount: attachments.length
+    })
+  }
+
+  const accessToken = await getGmailApiAccessToken()
+  const from = `"Buy Best" <${env.emailUser}>`
+  const raw = encodeBase64Url(buildMimeMessage({ to, from, subject, text, html }))
+
+  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ raw })
+  })
+
+  const responseBody = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    logEmailDebug('Gmail API send failed', {
+      status: response.status,
+      statusText: response.statusText,
+      response: responseBody
+    })
+
+    throw new Error(
+      responseBody?.error?.message ||
+      responseBody?.error_description ||
+      responseBody?.error ||
+      `Gmail API failed with status ${response.status}`
+    )
+  }
+
+  logEmailDebug('Gmail API email sent', {
+    id: responseBody?.id,
+    threadId: responseBody?.threadId
+  })
+
+  return responseBody
 }
 
 const sendResendEmail = async (to, subject, text, html, attachments = []) => {
@@ -226,13 +376,17 @@ const sendSmtpEmail = async (to, subject, text, html, attachments = []) => {
 }
 
 const sendEmail = async (to, subject, text, html, attachments = []) => {
-  if (missingEmailEnvVars.length || (!usesResend && !transporterPromise)) {
+  if (missingEmailEnvVars.length || (!usesResend && !usesGmailApi && !transporterPromise)) {
     throw new Error(
       `Email transport is not configured. Missing env vars: ${missingEmailEnvVars.join(', ')}`
     )
   }
 
   try {
+    if (usesGmailApi) {
+      return sendGmailApiEmail(to, subject, text, html, attachments)
+    }
+
     return usesResend
       ? sendResendEmail(to, subject, text, html, attachments)
       : sendSmtpEmail(to, subject, text, html, attachments)
@@ -241,6 +395,8 @@ const sendEmail = async (to, subject, text, html, attachments = []) => {
     throw new Error(getEmailTransportErrorMessage(error))
   }
 }
+
+const getEmailAttachments = () => usesSmtp ? brandLogoAttachment : []
 
 const brandLogoPath = path.resolve(__dirname, '../../../frontend/src/assests/image.png')
 const brandLogoCid = 'buybest-logo'
@@ -339,7 +495,7 @@ async function sendVerificationOtpEmail(userEmail, name, otp, expiresInMinutes) 
     footerNote: 'For your security, never share this OTP with anyone.'
   })
 
-  return sendEmail(userEmail, subject, text, html, brandLogoAttachment)
+  return sendEmail(userEmail, subject, text, html, getEmailAttachments())
 }
 
 async function sendWelcomeEmail(userEmail, name) {
@@ -360,7 +516,7 @@ async function sendWelcomeEmail(userEmail, name) {
     footerNote: 'Thanks for joining us and trusting our platform.'
   })
 
-  return sendEmail(userEmail, subject, text, html, brandLogoAttachment)
+  return sendEmail(userEmail, subject, text, html, getEmailAttachments())
 }
 
 async function sendPasswordResetEmail(userEmail, name, resetLink, expiresInMinutes) {
@@ -386,7 +542,7 @@ async function sendPasswordResetEmail(userEmail, name, resetLink, expiresInMinut
     footerNote: 'If you did not request this, you can safely ignore this email.'
   })
 
-  return sendEmail(userEmail, subject, text, html, brandLogoAttachment)
+  return sendEmail(userEmail, subject, text, html, getEmailAttachments())
 }
 
 module.exports = {
