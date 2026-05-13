@@ -1,127 +1,138 @@
-import React, { useEffect, useState, useRef } from "react"
-import { io, Socket } from "socket.io-client"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import type { AuthUser } from "@/lib/auth"
-import { API_BASE_URL } from "@/lib/api-config"
-import { supportApi } from "@/lib/support-api"
+import React, { useEffect, useState, useRef } from "react";
+import { io, Socket } from "socket.io-client";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { AuthUser } from "@/lib/auth";
+import { API_BASE_URL } from "@/lib/api-config";
+import { supportApi } from "@/lib/support-api";
 
 type Message = {
-  _id?: string
-  sender: string
-  senderId?: string
-  senderName?: string
-  senderRole?: string
-  text: string
-  createdAt?: string
-}
+  _id?: string;
+  sender: string;
+  senderId?: string;
+  senderName?: string;
+  senderRole?: string;
+  text: string;
+  createdAt?: string;
+};
 
 type IncomingMessage = Message & {
-  ticketId?: string
-}
+  ticketId?: string;
+};
 
 type SendMessageAck = {
-  ok?: boolean
-  error?: string
-}
+  ok?: boolean;
+  error?: string;
+};
 
-type JoinTicketAck = SendMessageAck
+type JoinTicketAck = SendMessageAck;
 
 type OrderHistoryItem = {
-  _id: string
-  orderId: string
+  _id: string;
+  orderId: string;
   productDetails: {
-    _id: string
-    name: string
-    image: string[]
-  }
-  total: number
-  paymentStatus: string
-  createdAt: string
-}
+    _id: string;
+    name: string;
+    image: string[];
+  };
+  total: number;
+  paymentStatus: string;
+  createdAt: string;
+};
 
 type Ticket = {
-  _id: string
-  title: string
-  description: string
-  status: string
-  messages: Message[]
+  _id: string;
+  title: string;
+  description: string;
+  status: string;
+  messages: Message[];
   user: {
-    _id: string
-    name: string
-    email: string
-    mobile?: string
-    orderHistory?: OrderHistoryItem[]
-  }
-}
+    _id: string;
+    name: string;
+    email: string;
+    mobile?: string;
+    orderHistory?: OrderHistoryItem[];
+  };
+};
 
-const getMessageSenderId = (message: Message) => message.senderId || message.sender
+const getMessageSenderId = (message: Message) =>
+  message.senderId || message.sender;
 
-const getMessageSenderRole = (message: Message) => message.senderRole || "user"
+const getMessageSenderRole = (message: Message) => message.senderRole || "user";
 
 const getMessageSenderName = (message: Message) => {
   if (message.senderName?.trim()) {
-    return message.senderName
+    return message.senderName;
   }
 
-  return getMessageSenderRole(message) === "support" ? "Support Agent" : "Customer"
-}
+  return getMessageSenderRole(message) === "support"
+    ? "Support Agent"
+    : "Customer";
+};
 
 const formatMessageTime = (createdAt?: string) => {
-  if (!createdAt) return ""
+  if (!createdAt) return "";
 
   return new Intl.DateTimeFormat("en-IN", {
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(createdAt))
-}
+  }).format(new Date(createdAt));
+};
 
 const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
-  const [tickets, setTickets] = useState<Ticket[]>([])
-  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null)
-  const [chatMessage, setChatMessage] = useState("")
-  const [sendError, setSendError] = useState("")
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [isChatConnected, setIsChatConnected] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const socketRef = useRef<Socket | null>(null)
-  const chatBottomRef = useRef<HTMLDivElement | null>(null)
-  const activeTicketIdRef = useRef<string | null>(null)
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+  const [chatMessage, setChatMessage] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isChatConnected, setIsChatConnected] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const socketRef = useRef<Socket | null>(null);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
+  const activeTicketIdRef = useRef<string | null>(null);
 
   const fetchAllTickets = async () => {
     try {
-      const res = await supportApi.get("/api/support/all")
-      setTickets(res.data.tickets)
+      const res = await supportApi.get("/api/support/all");
+      setTickets(res.data.tickets);
     } catch (err) {
-      console.error("Failed to fetch all tickets", err)
+      console.error("Failed to fetch all tickets", err);
     }
-  }
+  };
 
   const joinTicketChat = (ticket: Ticket) => {
-    setActiveTicket(ticket)
-    setSendError("")
+    setActiveTicket(ticket);
+    setSendError("");
     if (socketRef.current?.connected) {
-      socketRef.current.timeout(10000).emit("join_ticket", ticket._id, (error: Error | null, response?: JoinTicketAck) => {
-        if (error || response?.ok === false) {
-          setSendError(response?.error || "Unable to join this ticket chat.")
-        }
-      })
+      socketRef.current
+        .timeout(10000)
+        .emit(
+          "join_ticket",
+          ticket._id,
+          (error: Error | null, response?: JoinTicketAck) => {
+            if (error || response?.ok === false) {
+              setSendError(
+                response?.error || "Unable to join this ticket chat.",
+              );
+            }
+          },
+        );
     }
-  }
+  };
 
   const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!chatMessage.trim() || !activeTicket || !currentUser) return
+    e.preventDefault();
+    if (!chatMessage.trim() || !activeTicket || !currentUser) return;
 
-    const socket = socketRef.current
+    const socket = socketRef.current;
     if (!socket?.connected) {
-      setSendError("Chat is still connecting. Please try again in a moment.")
-      return
+      setSendError("Chat is still connecting. Please try again in a moment.");
+      return;
     }
 
-    const messageText = chatMessage.trim()
-    setSendError("")
-    setIsSendingMessage(true)
+    const messageText = chatMessage.trim();
+    setSendError("");
+    setIsSendingMessage(true);
 
     socket.timeout(10000).emit(
       "send_message",
@@ -130,189 +141,200 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
         text: messageText,
       },
       (error: Error | null, response?: SendMessageAck) => {
-        setIsSendingMessage(false)
+        setIsSendingMessage(false);
 
         if (error || !response?.ok) {
-          setSendError(response?.error || "Message timed out. Please try again.")
-          return
+          setSendError(
+            response?.error || "Message timed out. Please try again.",
+          );
+          return;
         }
 
-        setChatMessage("")
-      }
-    )
-  }
+        setChatMessage("");
+      },
+    );
+  };
 
   const closeTicket = async () => {
-    if (!activeTicket) return
+    if (!activeTicket) return;
     try {
-      await supportApi.patch(`/api/support/${activeTicket._id}/close`)
-      setActiveTicket({ ...activeTicket, status: 'closed' })
-      fetchAllTickets()
-    } catch(err) {
-      console.error("Failed to close ticket", err)
+      await supportApi.patch(`/api/support/${activeTicket._id}/close`);
+      setActiveTicket({ ...activeTicket, status: "closed" });
+      fetchAllTickets();
+    } catch (err) {
+      console.error("Failed to close ticket", err);
     }
-  }
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void fetchAllTickets()
-    }, 0)
+      void fetchAllTickets();
+    }, 0);
 
-    return () => window.clearTimeout(timer)
-  }, [])
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    activeTicketIdRef.current = activeTicket?._id || null
-  }, [activeTicket?._id])
+    activeTicketIdRef.current = activeTicket?._id || null;
+  }, [activeTicket?._id]);
 
   useEffect(() => {
     const socket = io(API_BASE_URL, {
       withCredentials: true,
       transports: ["websocket"],
+      upgrade: false,
+      rememberUpgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000,
-      forceNew: true,
-    })
-    socketRef.current = socket
+      timeout: 30000,
+      autoConnect: true,
+    });
+    socketRef.current = socket;
 
     const handleConnect = () => {
-      setIsChatConnected(true)
-      setSendError("")
-      console.log("Support socket connected:", socket.id)
+      setIsChatConnected(true);
+      setSendError("");
+      console.log("Support socket connected:", socket.id);
       if (activeTicketIdRef.current) {
-        socket.timeout(10000).emit("join_ticket", activeTicketIdRef.current, (error: Error | null, response?: JoinTicketAck) => {
-          if (error || response?.ok === false) {
-            setSendError(response?.error || "Unable to rejoin this ticket chat.")
-          }
-        })
+        socket
+          .timeout(10000)
+          .emit(
+            "join_ticket",
+            activeTicketIdRef.current,
+            (error: Error | null, response?: JoinTicketAck) => {
+              if (error || response?.ok === false) {
+                setSendError(
+                  response?.error || "Unable to rejoin this ticket chat.",
+                );
+              }
+            },
+          );
       }
-    }
+    };
 
     const handleDisconnect = (reason: string) => {
-      setIsChatConnected(false)
-      setIsSendingMessage(false)
-      console.log("Support socket disconnected", reason)
-    }
+      setIsChatConnected(false);
+      setIsSendingMessage(false);
+      console.log("Support socket disconnected", reason);
+    };
 
     const handleConnectError = (error: Error) => {
-      setIsChatConnected(false)
-      setSendError(error.message || "Unable to connect to support chat.")
-      console.error("Support socket connection failed", error)
-      console.log("Socket URL:", API_BASE_URL)
-      console.log("Socket transport:", socket.io.engine.transport.name)
-    }
+      setIsChatConnected(false);
+      setSendError(error.message || "Unable to connect to support chat.");
+      console.error("Support socket connection failed", error);
+      console.log("Socket URL:", API_BASE_URL);
+      console.log("Socket transport:", socket.io.engine?.transport?.name);
+      console.log("Socket connected:", socket.connected);
+    };
 
     const handleIncomingMessage = (message: IncomingMessage) => {
       setTickets((prev) =>
         prev.map((ticket) => {
           if (ticket._id !== message.ticketId) {
-            return ticket
+            return ticket;
           }
 
-          const alreadyExists = ticket.messages.some(
-            (msg) =>
-              msg._id && message._id
-                ? msg._id === message._id
-                : msg.createdAt === message.createdAt &&
-                  msg.text === message.text &&
-                  getMessageSenderId(msg) === getMessageSenderId(message)
-          )
+          const alreadyExists = ticket.messages.some((msg) =>
+            msg._id && message._id
+              ? msg._id === message._id
+              : msg.createdAt === message.createdAt &&
+                msg.text === message.text &&
+                getMessageSenderId(msg) === getMessageSenderId(message),
+          );
 
           if (alreadyExists) {
-            return ticket
+            return ticket;
           }
 
           return {
             ...ticket,
             messages: [...ticket.messages, message],
-          }
-        })
-      )
+          };
+        }),
+      );
 
       setActiveTicket((prev) => {
         if (!prev || !message.ticketId || prev._id !== message.ticketId) {
-          return prev
+          return prev;
         }
 
-        const alreadyExists = prev.messages.some(
-          (msg) =>
-            msg._id && message._id
-              ? msg._id === message._id
-              : msg.createdAt === message.createdAt &&
-                msg.text === message.text &&
-                getMessageSenderId(msg) === getMessageSenderId(message)
-        )
+        const alreadyExists = prev.messages.some((msg) =>
+          msg._id && message._id
+            ? msg._id === message._id
+            : msg.createdAt === message.createdAt &&
+              msg.text === message.text &&
+              getMessageSenderId(msg) === getMessageSenderId(message),
+        );
 
         if (alreadyExists) {
-          return prev
+          return prev;
         }
 
         return {
           ...prev,
           messages: [...prev.messages, message],
-        }
-      })
-    }
+        };
+      });
+    };
 
     const handleNewTicket = (ticket: Ticket) => {
       setTickets((prev) => {
         // Prevent duplicate tickets
-        if (prev.find((t) => t._id === ticket._id)) return prev
-        return [ticket, ...prev]
-      })
-    }
+        if (prev.find((t) => t._id === ticket._id)) return prev;
+        return [ticket, ...prev];
+      });
+    };
 
     const handleTicketClosed = ({ ticketId }: { ticketId?: string }) => {
-      if (!ticketId) return
+      if (!ticketId) return;
 
       setTickets((prev) =>
         prev.map((ticket) =>
-          ticket._id === ticketId ? { ...ticket, status: "closed" } : ticket
-        )
-      )
+          ticket._id === ticketId ? { ...ticket, status: "closed" } : ticket,
+        ),
+      );
 
       setActiveTicket((prev) =>
-        prev?._id === ticketId ? { ...prev, status: "closed" } : prev
-      )
-    }
+        prev?._id === ticketId ? { ...prev, status: "closed" } : prev,
+      );
+    };
 
-    socket.on("connect", handleConnect)
-    socket.on("disconnect", handleDisconnect)
-    socket.on("connect_error", handleConnectError)
-    socket.on("receive_message", handleIncomingMessage)
-    socket.on("support_receive_message", handleIncomingMessage)
-    socket.on("new_ticket", handleNewTicket)
-    socket.on("ticket_closed", handleTicketClosed)
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("connect_error", handleConnectError);
+    socket.on("receive_message", handleIncomingMessage);
+    socket.on("support_receive_message", handleIncomingMessage);
+    socket.on("new_ticket", handleNewTicket);
+    socket.on("ticket_closed", handleTicketClosed);
 
     return () => {
-      socket.off("connect", handleConnect)
-      socket.off("disconnect", handleDisconnect)
-      socket.off("connect_error", handleConnectError)
-      socket.off("receive_message", handleIncomingMessage)
-      socket.off("support_receive_message", handleIncomingMessage)
-      socket.off("new_ticket", handleNewTicket)
-      socket.off("ticket_closed", handleTicketClosed)
-      socket.disconnect()
-    }
-  }, [])
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("connect_error", handleConnectError);
+      socket.off("receive_message", handleIncomingMessage);
+      socket.off("support_receive_message", handleIncomingMessage);
+      socket.off("new_ticket", handleNewTicket);
+      socket.off("ticket_closed", handleTicketClosed);
+      socket.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: "smooth" })
+      chatBottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [activeTicket?.messages])
+  }, [activeTicket?.messages]);
 
-  const filteredTickets = tickets.filter(t => {
-    const q = searchQuery.toLowerCase()
+  const filteredTickets = tickets.filter((t) => {
+    const q = searchQuery.toLowerCase();
     return (
       t.title.toLowerCase().includes(q) ||
       t.user?.email.toLowerCase().includes(q) ||
       t.user?.name.toLowerCase().includes(q)
-    )
-  })
+    );
+  });
 
   return (
     <div className="flex min-h-[calc(100svh-4rem)] flex-col bg-[#fcf8ef] md:flex-row">
@@ -324,8 +346,12 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
       >
         <div className="p-4 border-b border-[#ece4d6] sticky top-0 bg-white shadow-sm z-10 flex flex-col gap-3">
           <div>
-            <h2 className="text-xl font-bold text-[#1B4D3E]">Support Dashboard</h2>
-            <p className="text-sm text-[#7d6d52]">Respond to active customer problems</p>
+            <h2 className="text-xl font-bold text-[#1B4D3E]">
+              Support Dashboard
+            </h2>
+            <p className="text-sm text-[#7d6d52]">
+              Respond to active customer problems
+            </p>
           </div>
           <input
             type="text"
@@ -338,7 +364,9 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
         <div className="max-h-[calc(100svh-9rem)] overflow-y-auto p-2 space-y-2 md:max-h-[calc(100svh-8rem)]">
           {filteredTickets.length === 0 ? (
-            <p className="p-4 text-center text-[#8f8168]">No tickets match search.</p>
+            <p className="p-4 text-center text-[#8f8168]">
+              No tickets match search.
+            </p>
           ) : (
             filteredTickets.map((ticket) => (
               <div
@@ -351,16 +379,22 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
                 }`}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-semibold text-sm text-[#2c2417] truncate pr-2">{ticket.title}</h3>
+                  <h3 className="font-semibold text-sm text-[#2c2417] truncate pr-2">
+                    {ticket.title}
+                  </h3>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${
-                      ticket.status === "open" ? "bg-red-100 text-red-700 font-bold" : "bg-gray-100 text-gray-700"
+                      ticket.status === "open"
+                        ? "bg-red-100 text-red-700 font-bold"
+                        : "bg-gray-100 text-gray-700"
                     }`}
                   >
                     {ticket.status.toUpperCase()}
                   </span>
                 </div>
-                <p className="text-xs text-[#7d6d52] line-clamp-1 mb-2">From: {ticket.user?.name}</p>
+                <p className="text-xs text-[#7d6d52] line-clamp-1 mb-2">
+                  From: {ticket.user?.name}
+                </p>
               </div>
             ))
           )}
@@ -375,7 +409,9 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
       >
         {!activeTicket ? (
           <div className="flex-1 flex items-center justify-center">
-            <p className="text-[#8f8168]">Select a request from the left to start responding.</p>
+            <p className="text-[#8f8168]">
+              Select a request from the left to start responding.
+            </p>
           </div>
         ) : (
           <>
@@ -392,13 +428,21 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                   <div>
-                    <h2 className="font-bold text-[#1B4D3E] text-lg">{activeTicket.title}</h2>
-                    <p className="text-sm text-[#7d6d52]">Ticket ID: #{activeTicket._id.slice(-6)}</p>
+                    <h2 className="font-bold text-[#1B4D3E] text-lg">
+                      {activeTicket.title}
+                    </h2>
+                    <p className="text-sm text-[#7d6d52]">
+                      Ticket ID: #{activeTicket._id.slice(-6)}
+                    </p>
                   </div>
                 </div>
                 <div>
                   {activeTicket.status === "open" ? (
-                    <Button variant="destructive" onClick={closeTicket} className="rounded-full shadow-sm hover:shadow-md">
+                    <Button
+                      variant="destructive"
+                      onClick={closeTicket}
+                      className="rounded-full shadow-sm hover:shadow-md"
+                    >
                       Resolve & Close
                     </Button>
                   ) : (
@@ -414,56 +458,85 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
             <div className="bg-[#fdfbf7] border-b border-[#ece4d6] flex flex-col text-sm text-[#7d6d52] shadow-inner">
               <div className="px-4 py-4 flex flex-col gap-6 border-b border-[#ece4d6]/50 sm:px-6 lg:flex-row">
                 <div className="flex min-w-0 items-center gap-3 lg:w-[280px] lg:shrink-0">
-                   <div className="min-w-12 w-12 h-12 rounded-full bg-gradient-to-br from-[#1B4D3E] to-[#2c7a65] text-white flex items-center justify-center font-bold text-lg shadow-sm">
-                     {activeTicket.user?.name?.charAt(0) || "?"}
-                   </div> 
-                   <div className="min-w-0">
-                     <p className="font-semibold text-[#1B4D3E] text-base truncate">{activeTicket.user?.name}</p>
-                     <p className="text-xs text-[#8f8168] truncate">{activeTicket.user?.email}</p>
-                     <p className="text-xs text-[#8f8168] mt-0.5 font-medium"><span className="text-[#2c2417]/60">Mobile:</span> {activeTicket.user?.mobile || "Not Provided"}</p>
-                   </div>
+                  <div className="min-w-12 w-12 h-12 rounded-full bg-gradient-to-br from-[#1B4D3E] to-[#2c7a65] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                    {activeTicket.user?.name?.charAt(0) || "?"}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[#1B4D3E] text-base truncate">
+                      {activeTicket.user?.name}
+                    </p>
+                    <p className="text-xs text-[#8f8168] truncate">
+                      {activeTicket.user?.email}
+                    </p>
+                    <p className="text-xs text-[#8f8168] mt-0.5 font-medium">
+                      <span className="text-[#2c2417]/60">Mobile:</span>{" "}
+                      {activeTicket.user?.mobile || "Not Provided"}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                   <h4 className="text-xs font-bold uppercase tracking-wider text-[#c8aa45] mb-2 sticky top-0 bg-[#fdfbf7] z-10 py-1 border-b border-[#ece4d6]/30">Customer Order History</h4>
-                   {activeTicket.user?.orderHistory && activeTicket.user.orderHistory.length > 0 ? (
-                     <div className="space-y-2 pb-1">
-                       {activeTicket.user.orderHistory.map(order => (
-                         <div key={order._id} className="flex flex-col gap-2 bg-white p-2 rounded-lg border border-[#ece4d6] text-xs shadow-sm transition sm:flex-row sm:items-center sm:justify-between">
-                           <div className="min-w-0 pr-0 sm:pr-4 flex-1">
-                             <p className="font-semibold text-[#1B4D3E] truncate">{order.productDetails?.name || "Product Item"}</p>
-                             <p className="text-gray-500 font-mono text-[10px] mt-0.5">ID: {order.orderId}</p>
-                           </div>
-                           <div className="shrink-0 sm:text-right">
-                             <p className="font-bold text-[#c8aa45]">₹{order.total}</p>
-                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium mt-1 inline-block ${order.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                               {order.paymentStatus?.toUpperCase() || 'UNKNOWN'}
-                             </span>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   ) : (
-                     <p className="text-xs text-[#8f8168] italic mt-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span> No previous orders found for this user.
-                     </p>
-                   )}
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#c8aa45] mb-2 sticky top-0 bg-[#fdfbf7] z-10 py-1 border-b border-[#ece4d6]/30">
+                    Customer Order History
+                  </h4>
+                  {activeTicket.user?.orderHistory &&
+                  activeTicket.user.orderHistory.length > 0 ? (
+                    <div className="space-y-2 pb-1">
+                      {activeTicket.user.orderHistory.map((order) => (
+                        <div
+                          key={order._id}
+                          className="flex flex-col gap-2 bg-white p-2 rounded-lg border border-[#ece4d6] text-xs shadow-sm transition sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0 pr-0 sm:pr-4 flex-1">
+                            <p className="font-semibold text-[#1B4D3E] truncate">
+                              {order.productDetails?.name || "Product Item"}
+                            </p>
+                            <p className="text-gray-500 font-mono text-[10px] mt-0.5">
+                              ID: {order.orderId}
+                            </p>
+                          </div>
+                          <div className="shrink-0 sm:text-right">
+                            <p className="font-bold text-[#c8aa45]">
+                              ₹{order.total}
+                            </p>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-medium mt-1 inline-block ${order.paymentStatus === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
+                            >
+                              {order.paymentStatus?.toUpperCase() || "UNKNOWN"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#8f8168] italic mt-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>{" "}
+                      No previous orders found for this user.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="p-4 bg-white/60 border-b border-[#ece4d6]">
-              <h4 className="text-xs font-bold tracking-wider uppercase text-[#c8aa45] mb-2">Original Problem Description:</h4>
-              <p className="text-sm text-gray-800 bg-[#fefdfb] border border-[#f0eadf] p-3 rounded-lg">{activeTicket.description}</p>
+              <h4 className="text-xs font-bold tracking-wider uppercase text-[#c8aa45] mb-2">
+                Original Problem Description:
+              </h4>
+              <p className="text-sm text-gray-800 bg-[#fefdfb] border border-[#f0eadf] p-3 rounded-lg">
+                {activeTicket.description}
+              </p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
               {activeTicket.messages.map((msg, i) => {
-                const isMine = getMessageSenderId(msg) === currentUser?.id
-                const senderRole = getMessageSenderRole(msg)
-                const isSupportMessage = senderRole === "support"
-                const senderLabel = isMine ? "You" : getMessageSenderName(msg)
+                const isMine = getMessageSenderId(msg) === currentUser?.id;
+                const senderRole = getMessageSenderRole(msg);
+                const isSupportMessage = senderRole === "support";
+                const senderLabel = isMine ? "You" : getMessageSenderName(msg);
                 return (
-                  <div key={msg._id || `${msg.createdAt || "message"}-${i}`} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                  <div
+                    key={msg._id || `${msg.createdAt || "message"}-${i}`}
+                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                  >
                     <div
                       className={`max-w-[88%] p-3 rounded-2xl sm:max-w-[78%] lg:max-w-[70%] ${
                         isMine
@@ -473,24 +546,39 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
                             : "bg-white border border-[#ece4d6] text-[#2c2417] rounded-bl-none shadow-sm"
                       }`}
                     >
-                      <div className={`mb-1 flex items-center gap-2 text-[11px] font-semibold ${isMine ? "text-white/85" : "text-[#8f8168]"}`}>
+                      <div
+                        className={`mb-1 flex items-center gap-2 text-[11px] font-semibold ${isMine ? "text-white/85" : "text-[#8f8168]"}`}
+                      >
                         <span>{senderLabel}</span>
-                        <span className={`rounded-full px-2 py-0.5 uppercase tracking-wide ${isMine ? "bg-white/20 text-white" : isSupportMessage ? "bg-[#d8efe5] text-[#1f6a52]" : "bg-[#f4ead8] text-[#8a6a1f]"}`}>
+                        <span
+                          className={`rounded-full px-2 py-0.5 uppercase tracking-wide ${isMine ? "bg-white/20 text-white" : isSupportMessage ? "bg-[#d8efe5] text-[#1f6a52]" : "bg-[#f4ead8] text-[#8a6a1f]"}`}
+                        >
                           {isSupportMessage ? "Support" : "Customer"}
                         </span>
-                        {msg.createdAt ? <span className={isMine ? "text-white/70" : "text-[#a3957d]"}>{formatMessageTime(msg.createdAt)}</span> : null}
+                        {msg.createdAt ? (
+                          <span
+                            className={
+                              isMine ? "text-white/70" : "text-[#a3957d]"
+                            }
+                          >
+                            {formatMessageTime(msg.createdAt)}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="text-sm">{msg.text}</p>
                     </div>
                   </div>
-                )
+                );
               })}
               <div ref={chatBottomRef} />
             </div>
 
             {activeTicket.status === "open" && (
               <div className="border-t border-[#ece4d6] bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <form onSubmit={sendMessage} className="flex flex-col gap-2 sm:flex-row">
+                <form
+                  onSubmit={sendMessage}
+                  className="flex flex-col gap-2 sm:flex-row"
+                >
                   <input
                     type="text"
                     value={chatMessage}
@@ -500,21 +588,33 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
                   />
                   <Button
                     type="submit"
-                    disabled={!chatMessage.trim() || isSendingMessage || !isChatConnected}
+                    disabled={
+                      !chatMessage.trim() ||
+                      isSendingMessage ||
+                      !isChatConnected
+                    }
                     className="h-12 w-full rounded-xl bg-[#1B4D3E] hover:bg-[#163d32] text-white font-medium disabled:opacity-60 sm:w-24"
                   >
                     {isSendingMessage ? "Sending" : "Reply"}
                   </Button>
                 </form>
-                {!isChatConnected ? <p className="mt-2 text-sm font-medium text-[#8f8168]">Reconnecting to chat...</p> : null}
-                {sendError ? <p className="mt-2 text-sm font-medium text-red-600">{sendError}</p> : null}
+                {!isChatConnected ? (
+                  <p className="mt-2 text-sm font-medium text-[#8f8168]">
+                    Reconnecting to chat...
+                  </p>
+                ) : null}
+                {sendError ? (
+                  <p className="mt-2 text-sm font-medium text-red-600">
+                    {sendError}
+                  </p>
+                ) : null}
               </div>
             )}
           </>
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SupportPanel
+export default SupportPanel;
