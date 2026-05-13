@@ -150,8 +150,8 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
   useEffect(() => {
     const socket = io(API_BASE_URL, {
       withCredentials: true,
-      transports: ["polling", "websocket"],
-      upgrade: true,
+      transports: ["websocket"],
+      upgrade: false,
       rememberUpgrade: true,
       reconnection: true,
       reconnectionAttempts: Infinity,

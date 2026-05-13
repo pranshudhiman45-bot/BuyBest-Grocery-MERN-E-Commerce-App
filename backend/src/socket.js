@@ -99,10 +99,23 @@ const isRateLimited = socket => {
   return false
 }
 
+const getAllowedSocketOrigins = () =>
+  Array.from(new Set([env.frontendUrl, ...env.corsOrigins].filter(Boolean)))
+
 const setupSocket = server => {
+  const allowedOrigins = getAllowedSocketOrigins()
+  const allowAllOrigins = allowedOrigins.includes('*')
+
   io = new Server(server, {
     cors: {
-      origin: env.corsOrigins,
+      origin(origin, callback) {
+        if (!origin || allowAllOrigins || allowedOrigins.includes(origin)) {
+          return callback(null, true)
+        }
+
+        console.warn(`Socket.IO CORS rejected origin: ${origin}`)
+        return callback(new Error('Not allowed by Socket.IO CORS'))
+      },
       credentials: true,
       methods: ['GET', 'POST']
     },
@@ -114,8 +127,8 @@ const setupSocket = server => {
 
   console.log(
     `Socket.IO initialized${
-      env.corsOrigins.length
-        ? ` for origins: ${env.corsOrigins.join(', ')}`
+      allowedOrigins.length
+        ? ` for origins: ${allowedOrigins.join(', ')}`
         : ''
     }`
   )
