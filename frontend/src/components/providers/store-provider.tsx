@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { Check, ShoppingCart, X } from "lucide-react"
 
 import {
   addCartItem as addCartItemApi,
@@ -26,7 +27,8 @@ import {
   type CheckoutResponse,
 } from "@/lib/store-api"
 import type { AuthUser } from "@/lib/auth"
-import type { Product } from "@/lib/storefront"
+import { appShellActions, useAppShellDispatch } from "@/store/app-shell"
+import { formatPrice, type Product } from "@/lib/storefront"
 
 const DELIVERY_FEE = 40
 const FREE_DELIVERY_THRESHOLD = 300
@@ -39,6 +41,14 @@ let cachedSettings: { value: { taxPercentage: number }; expiresAt: number } | nu
 type GuestCartEntry = {
   productId: string
   quantity: number
+}
+
+type CartToastState = {
+  productName: string
+  imageUrl?: string | null
+  quantity: number
+  itemCount: number
+  price?: number | null
 }
 
 type StoreProviderProps = {
@@ -233,27 +243,49 @@ const getProductLimitErrorMessage = (
 }
 
 export function StoreProvider({ children, currentUser }: StoreProviderProps) {
+  const dispatch = useAppShellDispatch()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [cartSummary, setCartSummary] = useState<CartSummary>(emptySummary)
   const [taxPercentage, setTaxPercentage] = useState(DEFAULT_TAX_PERCENTAGE)
   const [isCartLoading, setIsCartLoading] = useState(true)
   const [isFreeDeliveryPopupOpen, setIsFreeDeliveryPopupOpen] = useState(false)
-  const [cartToastMessage, setCartToastMessage] = useState("")
+  const [cartToast, setCartToast] = useState<CartToastState | null>(null)
   const previousSubtotalRef = useRef(0)
   const hasHydratedCartRef = useRef(false)
   const cartToastTimeoutRef = useRef<number | null>(null)
 
-  const showCartToast = useCallback((message = "Item added to cart") => {
+  const hideCartToast = useCallback(() => {
+    setCartToast(null)
+
+    if (cartToastTimeoutRef.current) {
+      window.clearTimeout(cartToastTimeoutRef.current)
+      cartToastTimeoutRef.current = null
+    }
+  }, [])
+
+  const showCartToast = useCallback((item: CartItem | undefined, itemCount: number) => {
     if (cartToastTimeoutRef.current) {
       window.clearTimeout(cartToastTimeoutRef.current)
     }
 
-    setCartToastMessage(message)
+    setCartToast({
+      productName: item?.name || "Item",
+      imageUrl: item?.imageUrl,
+      quantity: item?.quantity || 1,
+      itemCount,
+      price: item?.price ?? null,
+    })
+
     cartToastTimeoutRef.current = window.setTimeout(() => {
-      setCartToastMessage("")
+      setCartToast(null)
       cartToastTimeoutRef.current = null
-    }, 2200)
+    }, 3600)
   }, [])
+
+  const handleViewCartFromToast = useCallback(() => {
+    hideCartToast()
+    dispatch(appShellActions.openCart())
+  }, [dispatch, hideCartToast])
 
   useEffect(() => {
     return () => {
@@ -374,7 +406,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       try {
         const data = await addCartItemApi(productId, quantity)
         syncCartState(data)
-        showCartToast()
+        showCartToast(
+          data.items.find((item) => item.productId === productId),
+          data.summary.itemCount
+        )
         return
       } catch (error) {
         if (!isUnauthorizedError(error)) {
@@ -407,7 +442,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (actualQuantity < requestedGuestQuantity) {
       throw new Error(buildGuestQuantityLimitMessage(cartItem))
     }
-    showCartToast()
+    showCartToast(cartItem, guestCartState.summary.itemCount)
   }, [assertWithinProductLimit, cartItems, currentUser, showCartToast, syncCartState, taxPercentage])
 
   const updateCartQuantity = useCallback(async (productId: string, quantity: number) => {
@@ -527,13 +562,64 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   return (
     <StoreContext.Provider value={value}>
       {children}
-      {cartToastMessage ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[130] flex justify-center px-4 sm:bottom-7">
-          <div className="pointer-events-auto flex max-w-sm items-center gap-3 rounded-full border border-[#d7eadf] bg-white px-4 py-3 text-sm font-semibold text-[#1B4D3E] shadow-[0_16px_40px_rgba(27,77,62,0.18)]">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1B4D3E] text-xs font-bold text-white">
-              OK
-            </span>
-            <span>{cartToastMessage}</span>
+      {cartToast ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[130] flex justify-center px-3 sm:bottom-7">
+          <div className="pointer-events-auto w-full max-w-md animate-in fade-in-0 slide-in-from-bottom-4 zoom-in-95 overflow-hidden rounded-[18px] border border-[#d7eadf] bg-white shadow-[0_18px_48px_rgba(27,77,62,0.22)]">
+            <div className="flex items-center gap-3 px-3 py-3">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-[#edf3e7] bg-[#f8fcf6]">
+                {cartToast.imageUrl ? (
+                  <img
+                    src={cartToast.imageUrl}
+                    alt={cartToast.productName}
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <ShoppingCart className="h-6 w-6 text-[#1B4D3E]" />
+                )}
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1B4D3E] px-1 text-[10px] font-bold text-white">
+                  {cartToast.quantity}
+                </span>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#16813c]">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#16813c] text-white">
+                    <Check className="h-3 w-3" />
+                  </span>
+                  Added to cart
+                </div>
+                <p className="mt-1 truncate text-sm font-semibold text-[#241d13]">
+                  {cartToast.productName}
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-[#7d6d52]">
+                  {cartToast.price ? `${formatPrice(cartToast.price)} · ` : ""}
+                  {cartToast.itemCount} item{cartToast.itemCount === 1 ? "" : "s"} in cart
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={hideCartToast}
+                aria-label="Dismiss cart popup"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8b7c63] transition hover:bg-[#f7f1e7] hover:text-[#2c2417]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-t border-[#edf0e7] bg-[#fbfff9] px-3 py-2.5">
+              <span className="truncate text-xs font-semibold text-[#52715b]">
+                Ready for checkout when you are.
+              </span>
+              <button
+                type="button"
+                onClick={handleViewCartFromToast}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#1B4D3E] px-4 text-xs font-bold text-white transition hover:bg-[#163d32]"
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                View cart
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

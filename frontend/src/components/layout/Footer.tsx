@@ -15,6 +15,7 @@ type FooterProps = {
 
 const Footer = ({ currentUser = null }: FooterProps) => {
   const dispatch = useAppShellDispatch()
+  const currentYear = new Date().getFullYear()
 
   const handleFooterAction = (action: (typeof footerLinks)[number]["action"]) => {
     if (action === "about") {
@@ -50,7 +51,7 @@ const Footer = ({ currentUser = null }: FooterProps) => {
       <div className="mx-auto max-w-6xl px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-6 text-base text-[#6b5e4a]">
         <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4">
           <span className="font-semibold text-lg text-[#2c2417]">Buy Best</span>
-          <span>© {new Date().getFullYear()} All rights reserved</span>
+          <span>© {currentYear} All rights reserved</span>
         </div>
 
         <div className="flex gap-6">

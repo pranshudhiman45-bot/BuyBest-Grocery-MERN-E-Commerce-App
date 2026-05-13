@@ -240,9 +240,9 @@ const ProductCard = React.memo(function ProductCard({
             onNavigate(product.id);
           }
         }}
-        className="flex h-full flex-col gap-2 sm:gap-3 text-left"
+        className="flex h-full flex-col gap-1.5 sm:gap-2 text-left"
       >
-        <div className="relative flex w-full justify-center overflow-hidden bg-white px-2 pb-1 pt-2">
+        <div className="relative flex w-full justify-center overflow-hidden bg-white px-2 pb-0 pt-1.5">
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute left-2 top-2 sm:left-3 sm:top-3 z-10 flex flex-col gap-1">
               {badges.map((badge) => (
@@ -257,28 +257,28 @@ const ProductCard = React.memo(function ProductCard({
           ) : null}
 
           <motion.div
-            className="flex h-25 sm:h-34 w-full max-w-49 items-center justify-center"
+            className="flex h-22 w-full max-w-44 items-center justify-center sm:h-26"
             whileHover={{ scale: 1.05, rotate: -1.5 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
           >
             <ImagePlaceholder
               label={product.imageLabel}
               src={product.images?.[0]}
-              className="mx-auto h-20 w-20 sm:h-28.5 sm:w-28.5 bg-white"
+              className="mx-auto h-18 w-18 bg-white sm:h-23 sm:w-23"
             />
           </motion.div>
         </div>
 
-        <div className="flex grow flex-col px-3 pb-2 pt-1 sm:px-4 sm:pb-2.5 sm:pt-1.5">
+        <div className="flex grow flex-col px-3 pb-2 pt-0 sm:px-3.5 sm:pt-0.5">
           <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#9a8d74] sm:text-[11px]">
             {product.brand || product.categoryLabel}
           </p>
-          <h3 className="mt-1 line-clamp-2 min-h-9 text-[13px] font-semibold leading-relaxed text-[#2a2217] sm:min-h-8.5 sm:text-[15px] sm:leading-5">
+          <h3 className="mt-0.5 line-clamp-2 min-h-8 text-[13px] font-semibold leading-5 text-[#2a2217] sm:min-h-7.5 sm:text-[14px]">
             {product.name}
           </h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#7e7565] sm:text-[13px] sm:leading-5">{product.size}</p>
+          <p className="mt-0.5 text-[11px] leading-5 text-[#7e7565] sm:text-[12px]">{product.size}</p>
 
-          <div className="mt-auto pt-2 flex items-end justify-between gap-1 sm:mt-2.5 sm:gap-3 sm:pt-0">
+          <div className="mt-auto flex items-end justify-between gap-1 pt-1 sm:mt-1.5 sm:gap-2 sm:pt-0">
             <div className="flex flex-col">
               <span className="text-[14px] font-bold text-[#241d13] sm:text-[15px]">
                 {formatPrice(product.price)}
@@ -323,7 +323,7 @@ const ProductCard = React.memo(function ProductCard({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 min-w-16 rounded-[10px] border-[#49a339] bg-[#f7fff5] px-3 text-[12px] font-bold tracking-[0.02em] text-[#3e8d31] hover:bg-[#eef9ea] hover:text-[#347d29] sm:h-11 sm:min-w-26.5 sm:rounded-[12px] sm:px-5 sm:text-[16px]"
+                className="h-7 min-w-15 rounded-[10px] border-[#49a339] bg-[#f7fff5] px-3 text-[12px] font-bold tracking-[0.02em] text-[#3e8d31] hover:bg-[#eef9ea] hover:text-[#347d29] sm:h-9 sm:min-w-22 sm:rounded-[12px] sm:px-4 sm:text-[14px]"
                 onClick={(event) => {
                   event.stopPropagation();
                   onAdd(product.id);
