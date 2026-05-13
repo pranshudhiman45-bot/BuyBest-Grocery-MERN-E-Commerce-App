@@ -166,12 +166,19 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
   }, [activeTicket?._id])
 
   useEffect(() => {
-    const socket = io(API_BASE_URL, { withCredentials: true })
+    const socket = io(API_BASE_URL, {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    })
     socketRef.current = socket
 
     const handleConnect = () => {
       setIsChatConnected(true)
       setSendError("")
+      console.log("Support socket connected:", socket.id)
       if (activeTicketIdRef.current) {
         socket.timeout(10000).emit("join_ticket", activeTicketIdRef.current, (error: Error | null, response?: JoinTicketAck) => {
           if (error || response?.ok === false) {
@@ -184,12 +191,14 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
     const handleDisconnect = () => {
       setIsChatConnected(false)
       setIsSendingMessage(false)
+      console.log("Support socket disconnected")
     }
 
     const handleConnectError = (error: Error) => {
       setIsChatConnected(false)
       setSendError(error.message || "Unable to connect to support chat.")
       console.error("Support socket connection failed", error)
+      console.log("Socket URL:", API_BASE_URL)
     }
 
     const handleIncomingMessage = (message: IncomingMessage) => {
