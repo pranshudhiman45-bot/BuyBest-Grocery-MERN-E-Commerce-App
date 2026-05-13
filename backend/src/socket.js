@@ -35,7 +35,7 @@ const parseCookieHeader = (cookieHeader = '') => {
   return parsedCookies
 }
 
-const formatMessage = (message) => {
+const formatMessage = message => {
   const sender = message?.sender
   const senderId =
     sender && typeof sender === 'object' && sender._id
@@ -46,15 +46,21 @@ const formatMessage = (message) => {
     _id: message._id,
     sender: senderId,
     senderId,
-    senderName: sender && typeof sender === 'object' ? sender.name || 'Unknown' : 'Unknown',
-    senderRole: sender && typeof sender === 'object' ? sender.role || USER_ROLES.USER : USER_ROLES.USER,
+    senderName:
+      sender && typeof sender === 'object'
+        ? sender.name || 'Unknown'
+        : 'Unknown',
+    senderRole:
+      sender && typeof sender === 'object'
+        ? sender.role || USER_ROLES.USER
+        : USER_ROLES.USER,
     text: message.text,
     createdAt: message.createdAt,
     updatedAt: message.updatedAt
   }
 }
 
-const findUserFromAccessToken = async (accessToken) => {
+const findUserFromAccessToken = async accessToken => {
   if (!accessToken) {
     return null
   }
@@ -63,7 +69,7 @@ const findUserFromAccessToken = async (accessToken) => {
   return userModel.findById(decoded.userId)
 }
 
-const findUserFromRefreshToken = async (refreshToken) => {
+const findUserFromRefreshToken = async refreshToken => {
   if (!refreshToken) {
     return null
   }
@@ -78,10 +84,10 @@ const findUserFromRefreshToken = async (refreshToken) => {
   return user
 }
 
-const isRateLimited = (socket) => {
+const isRateLimited = socket => {
   const now = Date.now()
   const recentMessages = (socket.data.messageTimestamps || []).filter(
-    (timestamp) => now - timestamp < MESSAGE_RATE_LIMIT_WINDOW_MS
+    timestamp => now - timestamp < MESSAGE_RATE_LIMIT_WINDOW_MS
   )
 
   if (recentMessages.length >= MESSAGE_RATE_LIMIT_MAX) {
@@ -93,25 +99,28 @@ const isRateLimited = (socket) => {
   return false
 }
 
-const setupSocket = (server) => {
+const setupSocket = server => {
   io = new Server(server, {
     cors: {
       origin: env.corsOrigins,
       credentials: true,
       methods: ['GET', 'POST']
     },
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000
   })
 
   console.log(
     `Socket.IO initialized${
-      env.corsOrigins.length ? ` for origins: ${env.corsOrigins.join(', ')}` : ''
+      env.corsOrigins.length
+        ? ` for origins: ${env.corsOrigins.join(', ')}`
+        : ''
     }`
   )
 
-  io.engine.on('connection_error', (error) => {
+  io.engine.on('connection_error', error => {
     console.error(
       `Socket.IO connection error: ${error.message || 'Unknown socket error'}`
     )
@@ -123,7 +132,9 @@ const setupSocket = (server) => {
       const cookieToken = cookies[ACCESS_TOKEN_COOKIE_NAME]
       const refreshToken = cookies[REFRESH_TOKEN_COOKIE_NAME]
       const authToken = socket.handshake.auth?.token
-      const bearerToken = socket.handshake.headers?.authorization?.startsWith('Bearer ')
+      const bearerToken = socket.handshake.headers?.authorization?.startsWith(
+        'Bearer '
+      )
         ? socket.handshake.headers.authorization.split(' ')[1]
         : null
 
@@ -159,7 +170,7 @@ const setupSocket = (server) => {
     }
   })
 
-  io.on('connection', (socket) => {
+  io.on('connection', socket => {
     console.log(`Socket connected: ${socket.id}`)
 
     if (socket.user?.role === USER_ROLES.SUPPORT) {
@@ -168,7 +179,7 @@ const setupSocket = (server) => {
     }
 
     socket.on('join_ticket', async (ticketId, callback) => {
-      const reply = (payload) => {
+      const reply = payload => {
         if (typeof callback === 'function') {
           callback(payload)
         }
@@ -179,17 +190,23 @@ const setupSocket = (server) => {
           return reply({ ok: false, error: 'Ticket id is required' })
         }
 
-        const ticket = await ticketModel.findById(ticketId).select('user status')
+        const ticket = await ticketModel
+          .findById(ticketId)
+          .select('user status')
 
         if (!ticket) {
           return reply({ ok: false, error: 'Ticket not found' })
         }
 
         const isSupportAgent = socket.user.role === USER_ROLES.SUPPORT
-        const isTicketOwner = ticket.user.toString() === socket.user._id.toString()
+        const isTicketOwner =
+          ticket.user.toString() === socket.user._id.toString()
 
         if (!isSupportAgent && !isTicketOwner) {
-          return reply({ ok: false, error: 'Not authorized to join this ticket' })
+          return reply({
+            ok: false,
+            error: 'Not authorized to join this ticket'
+          })
         }
 
         socket.join(ticketId)
@@ -202,7 +219,7 @@ const setupSocket = (server) => {
     })
 
     socket.on('send_message', async (data, callback) => {
-      const reply = (payload) => {
+      const reply = payload => {
         if (typeof callback === 'function') {
           callback(payload)
         }
@@ -214,7 +231,10 @@ const setupSocket = (server) => {
       }
 
       if (isRateLimited(socket)) {
-        return reply({ ok: false, error: 'You are sending messages too quickly. Please wait a moment.' })
+        return reply({
+          ok: false,
+          error: 'You are sending messages too quickly. Please wait a moment.'
+        })
       }
 
       try {
@@ -226,14 +246,21 @@ const setupSocket = (server) => {
         const normalizedText = String(text || '').trim()
 
         if (!normalizedText || normalizedText.length > 2000) {
-          return reply({ ok: false, error: 'Message must be between 1 and 2000 characters' })
+          return reply({
+            ok: false,
+            error: 'Message must be between 1 and 2000 characters'
+          })
         }
 
         const isSupportAgent = socket.user.role === USER_ROLES.SUPPORT
-        const isTicketOwner = ticket.user.toString() === socket.user._id.toString()
+        const isTicketOwner =
+          ticket.user.toString() === socket.user._id.toString()
 
         if (!isSupportAgent && !isTicketOwner) {
-          return reply({ ok: false, error: 'Not authorized to send messages for this ticket' })
+          return reply({
+            ok: false,
+            error: 'Not authorized to send messages for this ticket'
+          })
         }
 
         if (ticket.status === 'closed') {
@@ -277,7 +304,7 @@ const setupSocket = (server) => {
       }
     })
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', reason => {
       console.log(`Socket disconnected: ${socket.id}, reason: ${reason}`)
     })
   })
