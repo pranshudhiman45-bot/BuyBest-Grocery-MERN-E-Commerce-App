@@ -34,20 +34,37 @@ const cloneHeaders = (res) => {
 const idempotencyMiddleware = (options = {}) => {
   const ttlMs = parseTtlMs(options.ttlMs)
 
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!IDEMPOTENT_METHODS.has(req.method)) {
       return next()
     }
 
     const key = getIdempotencyKey(req)
+
+    if (!key) {
+      return next()
+    }
+
     const fingerprint = buildRequestFingerprint(req)
 
     req.idempotency = { key, fingerprint }
     res.setHeader('Idempotency-Key', key)
 
-    const { created, entry } = startRequest({ key, fingerprint, ttlMs })
+    let requestState
+
+    try {
+      requestState = await startRequest({ key, fingerprint, ttlMs })
+    } catch (error) {
+      return next(error)
+    }
+
+    const { created, entry } = requestState
 
     if (!created) {
+      if (!entry) {
+        return next(new AppError('Unable to load idempotency state for this request', 500))
+      }
+
       if (entry.fingerprint !== fingerprint) {
         return next(new AppError('Idempotency key already used for a different request', 409))
       }
@@ -56,6 +73,10 @@ const idempotencyMiddleware = (options = {}) => {
         return res.status(409).json({
           message: 'A request with this idempotency key is already being processed'
         })
+      }
+
+      if (!entry.response) {
+        return next(new AppError('Stored idempotency response is unavailable', 500))
       }
 
       res.setHeader('Idempotency-Status', 'replayed')
@@ -91,11 +112,11 @@ const idempotencyMiddleware = (options = {}) => {
 
     res.on('finish', () => {
       if (res.statusCode < 200 || res.statusCode >= 300) {
-        releaseRequest(key)
+        void releaseRequest(key)
         return
       }
 
-      completeRequest({
+      void completeRequest({
         key,
         statusCode: res.statusCode,
         headers: cloneHeaders(res),
@@ -106,7 +127,7 @@ const idempotencyMiddleware = (options = {}) => {
 
     res.on('close', () => {
       if (!res.writableEnded) {
-        releaseRequest(key)
+        void releaseRequest(key)
       }
     })
 

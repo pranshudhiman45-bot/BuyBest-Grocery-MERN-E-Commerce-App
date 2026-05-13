@@ -399,36 +399,45 @@ const buildStripeLineItems = ({ purchasedItems, summary, payableTotal, coupon, c
 
 const createStripeCheckoutSession = async (
   user,
-  { addressId, couponCode, paymentMethod = 'credit_card' } = {}
+  { addressId, couponCode, paymentMethod = 'credit_card', idempotencyKey } = {}
 ) => {
   const stripeClient = ensureStripeConfigured()
   const context = await buildCheckoutContext(user, { addressId, couponCode })
 
-  const session = await stripeClient.checkout.sessions.create({
-    mode: 'payment',
-    payment_method_types: paymentMethod === 'upi' ? ['upi'] : ['card'],
-    line_items: buildStripeLineItems(context),
-    success_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=cancelled&session_id={CHECKOUT_SESSION_ID}`,
-    customer_email: user.email,
-    metadata: {
-      userId: user._id.toString(),
-      addressId: context.selectedAddress._id.toString(),
-      paymentMethod,
-      couponCode: context.coupon?.code || '',
-      payableTotal: context.payableTotal.toFixed(2)
-    }
+  const session = await stripeClient.checkout.sessions.create(
+    {
+      mode: 'payment',
+      payment_method_types: paymentMethod === 'upi' ? ['upi'] : ['card'],
+      line_items: buildStripeLineItems(context),
+      success_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${env.frontendUrl.replace(/\/$/, '')}/checkout?stripe=cancelled&session_id={CHECKOUT_SESSION_ID}`,
+      customer_email: user.email,
+      metadata: {
+        userId: user._id.toString(),
+        addressId: context.selectedAddress._id.toString(),
+        paymentMethod,
+        couponCode: context.coupon?.code || '',
+        payableTotal: context.payableTotal.toFixed(2)
+      }
+    },
+    idempotencyKey ? { idempotencyKey } : undefined
+  )
+
+  const existingSessionOrderCount = await orderModel.countDocuments({
+    paymentId: session.id
   })
 
-  await createOrderRecords({
-    userId: user._id,
-    selectedAddress: context.selectedAddress,
-    checkoutItems: context.checkoutItems,
-    paymentId: session.id,
-    paymentMethod,
-    paymentStatus: 'pending',
-    couponCode: context.coupon?.code || null
-  })
+  if (existingSessionOrderCount === 0) {
+    await createOrderRecords({
+      userId: user._id,
+      selectedAddress: context.selectedAddress,
+      checkoutItems: context.checkoutItems,
+      paymentId: session.id,
+      paymentMethod,
+      paymentStatus: 'pending',
+      couponCode: context.coupon?.code || null
+    })
+  }
 
   return {
     sessionId: session.id,

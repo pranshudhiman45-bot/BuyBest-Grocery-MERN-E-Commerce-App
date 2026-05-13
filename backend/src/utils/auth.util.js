@@ -87,7 +87,8 @@ const buildUserResponse = user => ({
 
 const buildAuthResponse = (user, tokens = {}) => ({
   user: buildUserResponse(user),
-  ...(tokens.accessToken ? { accessToken: tokens.accessToken } : {})
+  ...(tokens.accessToken ? { accessToken: tokens.accessToken } : {}),
+  ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {})
 })
 
 module.exports = {

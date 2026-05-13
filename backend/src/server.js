@@ -16,8 +16,8 @@ const listen = () =>
   })
 
 const startServer = async () => {
-  await listen()
   await connectDB()
+  await listen()
 
   console.log(`Server is running on port ${env.port}`)
   console.log(`Socket.IO is ready at /socket.io (${io.engine.clientsCount} connected clients)`)

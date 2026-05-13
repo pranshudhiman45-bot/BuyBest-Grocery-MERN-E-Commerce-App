@@ -95,7 +95,17 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
   const fetchAllTickets = async () => {
     try {
       const res = await supportApi.get("/api/support/all");
-      setTickets(res.data.tickets);
+      const nextTickets = res.data.tickets || [];
+      setTickets(nextTickets);
+      setActiveTicket((current) => {
+        const activeTicketId = current?._id || activeTicketIdRef.current;
+
+        if (!activeTicketId) {
+          return current;
+        }
+
+        return nextTickets.find((ticket: Ticket) => ticket._id === activeTicketId) || current;
+      });
     } catch (err) {
       console.error("Failed to fetch all tickets", err);
     }
@@ -183,9 +193,10 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
     const socket = io(API_BASE_URL, {
       auth: provideSocketAuth,
       withCredentials: true,
-      transports: ["websocket"],
-      upgrade: false,
-      rememberUpgrade: true,
+      path: "/socket.io",
+      transports: ["polling", "websocket"],
+      upgrade: true,
+      rememberUpgrade: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -199,6 +210,7 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
       setIsChatConnected(true);
       setSendError("");
       console.log("Support socket connected:", socket.id);
+      void fetchAllTickets();
       if (activeTicketIdRef.current) {
         socket
           .timeout(10000)

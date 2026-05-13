@@ -20,12 +20,12 @@ const listProducts = asyncHandler(async (req, res) => {
     publish: { $ne: false }
   }
 
-  if (category) {
-    query.category = String(category)
-  }
-
   let products = await productModel.find(query).sort({ createdAt: -1 })
   products = products.map(mapProductToStorefront)
+
+  if (category) {
+    products = products.filter((product) => product.category === String(category))
+  }
 
   const parsedLimit = Number(limit)
   if (Number.isFinite(parsedLimit) && parsedLimit > 0) {

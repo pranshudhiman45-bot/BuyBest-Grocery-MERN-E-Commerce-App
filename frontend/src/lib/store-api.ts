@@ -427,12 +427,29 @@ export async function removeCartItem(productId: string) {
   }
 }
 
-export async function checkoutCart(paymentMethod: string, couponCode?: string) {
+const buildIdempotencyConfig = (idempotencyKey?: string) =>
+  idempotencyKey
+    ? {
+        headers: {
+          "Idempotency-Key": idempotencyKey,
+        },
+      }
+    : undefined
+
+export async function checkoutCart(
+  paymentMethod: string,
+  couponCode?: string,
+  idempotencyKey?: string
+) {
   try {
-    const response = await storeApi.post<CheckoutResponse>("/api/cart/checkout", {
-      paymentMethod,
-      couponCode,
-    })
+    const response = await storeApi.post<CheckoutResponse>(
+      "/api/cart/checkout",
+      {
+        paymentMethod,
+        couponCode,
+      },
+      buildIdempotencyConfig(idempotencyKey)
+    )
 
     return response.data
   } catch (error) {
@@ -442,7 +459,8 @@ export async function checkoutCart(paymentMethod: string, couponCode?: string) {
 
 export async function createStripeCheckoutSession(
   paymentMethod: string,
-  couponCode?: string
+  couponCode?: string,
+  idempotencyKey?: string
 ) {
   try {
     const response = await storeApi.post<StripeCheckoutSessionResponse>(
@@ -450,7 +468,8 @@ export async function createStripeCheckoutSession(
       {
         paymentMethod,
         couponCode,
-      }
+      },
+      buildIdempotencyConfig(idempotencyKey)
     )
 
     return response.data

@@ -24,6 +24,7 @@ import {
 } from "@/store/app-shell";
 
 const PRODUCTS_PER_PAGE = 16;
+const DEFAULT_MAX_PRICE = 100000;
 const SPECIAL_CATEGORY_ALL = "all";
 const SPECIAL_CATEGORY_NEW_ARRIVALS = "new-arrivals";
 const SPECIAL_CATEGORY_BEST_SELLERS = "best-sellers";
@@ -90,8 +91,8 @@ type FilterAction =
 const initialFilterState: FilterState = {
   selectedBrand: "all",
   minimumDiscount: 0,
-  maxPrice: 500,
-  sortBy: "relevance",
+  maxPrice: DEFAULT_MAX_PRICE,
+  sortBy: "latest",
   currentPage: 1,
   showFilters: false,
 };
@@ -360,6 +361,15 @@ const Home = () => {
   const deferredMaxPrice = useDeferredValue(filters.maxPrice);
   const deferredSortBy = useDeferredValue(filters.sortBy);
 
+  const maxProductPrice = useMemo(
+    () =>
+      Math.max(
+        500,
+        ...products.map((product) => Math.ceil(product.price || 0)),
+      ),
+    [products],
+  );
+
   useEffect(() => {
     const loadStorefront = async () => {
       setIsLoading(true);
@@ -496,16 +506,10 @@ const Home = () => {
           );
         case "name":
           return left.name.localeCompare(right.name);
+        case "latest":
         case "relevance":
         default:
-          if (Boolean(right.isBestSeller) !== Boolean(left.isBestSeller)) {
-            return (
-              Number(Boolean(right.isBestSeller)) -
-              Number(Boolean(left.isBestSeller))
-            );
-          }
-
-          return left.name.localeCompare(right.name);
+          return 0;
       }
     });
   }, [
@@ -795,15 +799,17 @@ const Home = () => {
                   <div className="flex items-center justify-between text-sm font-bold text-[#31291d]">
                     <span>Price Range</span>
                     <span className="text-[#a0801a]">
-                      {formatPrice(filters.maxPrice)}
+                      {filters.maxPrice >= DEFAULT_MAX_PRICE
+                        ? "All"
+                        : formatPrice(filters.maxPrice)}
                     </span>
                   </div>
                   <input
                     type="range"
-                    min="50"
-                    max="500"
+                    min="0"
+                    max={maxProductPrice}
                     step="10"
-                    value={filters.maxPrice}
+                    value={Math.min(filters.maxPrice, maxProductPrice)}
                     onChange={(event) =>
                       startFilterTransition(() => {
                         dispatch({
@@ -815,8 +821,8 @@ const Home = () => {
                     className="mt-4 h-2 w-full cursor-pointer accent-[#b08b16]"
                   />
                   <div className="mt-2 flex justify-between text-xs text-[#a2957b]">
-                    <span>₹50</span>
-                    <span>₹500+</span>
+                    <span>₹0</span>
+                    <span>{formatPrice(maxProductPrice)}+</span>
                   </div>
                 </div>
 
@@ -890,7 +896,7 @@ const Home = () => {
                       }
                       className="h-10 w-full min-w-35 appearance-none rounded-xl border border-[#e6dcc9] bg-[#fbf8f2] pl-4 pr-10 text-sm font-medium text-[#4b402a] shadow-sm outline-none transition-colors focus:border-[#c9aa45] focus:ring-1 focus:ring-[#c9aa45]"
                     >
-                      <option value="relevance">Relevance</option>
+                      <option value="latest">Newest</option>
                       <option value="price-low">Price: Low to High</option>
                       <option value="price-high">Price: High to Low</option>
                       <option value="discount">Biggest Discount</option>

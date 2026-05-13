@@ -23,6 +23,7 @@ const {
 const app = express()
 const allowAllCorsOrigins = env.corsOrigins.includes('*')
 
+app.set('trust proxy', 1)
 app.use(helmet())
 app.use(cors({
   origin(origin, callback) {

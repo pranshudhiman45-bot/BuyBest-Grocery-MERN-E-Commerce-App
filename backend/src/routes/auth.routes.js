@@ -13,6 +13,7 @@ const authRateLimit = createRateLimit({
 
 router.get('/google', authController.startGoogleAuth)
 router.get('/google/callback', authController.completeGoogleAuth, authController.googleAuthCallback)
+router.post('/google/session', authController.completeGoogleAuthHandoff)
 router.get('/google/failure', authController.googleAuthFailure)
 router.post('/register', authRateLimit, authController.registerUser)
 router.get('/me', authMiddleware, authController.getCurrentUser)

@@ -160,14 +160,20 @@ const resetPassword = asyncHandler(async (req, res) => {
 })
 
 const googleAuthCallback = asyncHandler(async (req, res) => {
-  await authService.googleAuthCallback(req.user, res)
+  const response = await authService.googleAuthCallback(req.user, res)
 
   return sendFrontendRedirect(
     res,
     appendRedirectStatus(req.query.state, {
-      googleAuth: 'success'
+      googleAuth: 'success',
+      handoff: response.body.handoffToken
     })
   )
+})
+
+const completeGoogleAuthHandoff = asyncHandler(async (req, res) => {
+  const response = await authService.completeGoogleAuthHandoff(req.body, res)
+  res.status(response.statusCode).json(response.body)
 })
 
 const googleAuthFailure = (req, res) => {
@@ -215,6 +221,7 @@ module.exports = {
   startGoogleAuth,
   completeGoogleAuth,
   googleAuthFailure,
+  completeGoogleAuthHandoff,
   registerUser,
   getCurrentUser,
   getSocketToken,

@@ -39,7 +39,17 @@ const issueAuthTokens = async (user, res) => {
 
   setAuthCookies(res, { accessToken, refreshToken })
 
-  return { accessToken }
+  return { accessToken, refreshToken }
+}
+
+const createAuthHandoffToken = async (user) => {
+  const handoffToken = generateResetToken()
+
+  user.authHandoffToken = hashToken(handoffToken)
+  user.authHandoffExpiresAt = new Date(Date.now() + 2 * 60 * 1000)
+  await user.save()
+
+  return handoffToken
 }
 
 const getRefreshTokenFromRequest = ({ cookies, body, headers }) => {
@@ -52,7 +62,9 @@ const getRefreshTokenFromRequest = ({ cookies, body, headers }) => {
 
 const sendOtpForUser = async (user) => {
   const otp = generateOtp()
+  const verificationToken = generateResetToken()
   user.otpCode = hashOtp(otp)
+  user.otpSessionToken = hashToken(verificationToken)
   user.otpExpiresAt = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000)
 
   await user.save()
@@ -62,6 +74,8 @@ const sendOtpForUser = async (user) => {
     otp,
     env.otpExpiryMinutes
   )
+
+  return verificationToken
 }
 
 const registerUser = async (body) => {
@@ -90,13 +104,14 @@ const registerUser = async (body) => {
     })
   }
 
-  await sendOtpForUser(user)
+  const verificationToken = await sendOtpForUser(user)
 
   return {
     statusCode: 201,
     body: {
       message: 'OTP sent to your email. Please verify to access the website.',
-      email: user.email
+      email: user.email,
+      verificationToken
     }
   }
 }
@@ -168,8 +183,8 @@ const getOrderHistory = async user => {
 }
 
 const verifyRegistrationOtp = async (body, res) => {
-  const { email, otp } = validateOtpPayload(body)
-  const user = await userModel.findOne({ email }).select('+password +otpCode')
+  const { email, otp, verificationToken } = validateOtpPayload(body)
+  const user = await userModel.findOne({ email }).select('+password +otpCode +otpSessionToken')
 
   if (!user) {
     throw new AppError('User not found', 404)
@@ -187,12 +202,16 @@ const verifyRegistrationOtp = async (body, res) => {
     }
   }
 
-  if (!user.otpCode || !user.otpExpiresAt) {
-    throw new AppError('OTP not requested for this user', 400)
+  if (!user.otpCode || !user.otpExpiresAt || !user.otpSessionToken) {
+    throw new AppError('OTP not requested for this session. Please request a new one.', 400)
   }
 
   if (user.otpExpiresAt.getTime() < Date.now()) {
     throw new AppError('OTP has expired. Please request a new one.', 400)
+  }
+
+  if (user.otpSessionToken !== hashToken(verificationToken)) {
+    throw new AppError('This OTP session is no longer valid. Please request a new OTP.', 401)
   }
 
   if (user.otpCode !== hashOtp(otp)) {
@@ -201,6 +220,7 @@ const verifyRegistrationOtp = async (body, res) => {
 
   user.isVerified = true
   user.otpCode = null
+  user.otpSessionToken = null
   user.otpExpiresAt = null
   await user.save()
 
@@ -237,13 +257,14 @@ const resendRegistrationOtp = async (body) => {
     throw new AppError('User is already verified', 400)
   }
 
-  await sendOtpForUser(user)
+  const verificationToken = await sendOtpForUser(user)
 
   return {
     statusCode: 200,
     body: {
       message: 'A new OTP has been sent to your email',
-      email: user.email
+      email: user.email,
+      verificationToken
     }
   }
 }
@@ -380,6 +401,7 @@ const googleAuthCallback = async (googleUser, res) => {
     if (user.isVerified === false) {
       user.isVerified = true
       user.otpCode = null
+      user.otpSessionToken = null
       user.otpExpiresAt = null
       shouldSave = true
     }
@@ -390,14 +412,47 @@ const googleAuthCallback = async (googleUser, res) => {
   }
 
   const tokens = await issueAuthTokens(user, res)
+  const handoffToken = await createAuthHandoffToken(user)
 
   return {
     statusCode: 200,
     body: {
       message: 'Google login successful',
       ...buildAuthResponse(user, tokens),
+      handoffToken,
       authProvider: AUTH_PROVIDERS.GOOGLE,
       welcomeEmailSent
+    }
+  }
+}
+
+const completeGoogleAuthHandoff = async (body, res) => {
+  const handoffToken = String(body?.handoffToken || '').trim()
+
+  if (!handoffToken) {
+    throw new AppError('Google login handoff token is required', 400)
+  }
+
+  const user = await userModel.findOne({
+    authHandoffToken: hashToken(handoffToken),
+    authHandoffExpiresAt: { $gt: new Date() }
+  }).select('+authHandoffToken')
+
+  if (!user) {
+    throw new AppError('Google login session expired. Please try again.', 401)
+  }
+
+  user.authHandoffToken = null
+  user.authHandoffExpiresAt = null
+
+  const tokens = await issueAuthTokens(user, res)
+
+  return {
+    statusCode: 200,
+    body: {
+      message: 'Google login completed',
+      ...buildAuthResponse(user, tokens),
+      authProvider: AUTH_PROVIDERS.GOOGLE
     }
   }
 }
@@ -729,6 +784,7 @@ module.exports = {
   forgotPassword,
   resetPassword,
   googleAuthCallback,
+  completeGoogleAuthHandoff,
   loginUser,
   refreshAccessToken,
   logoutUser,

@@ -1,9 +1,7 @@
 const crypto = require('crypto')
-const { v4: uuidv4 } = require('uuid')
+const idempotencyModel = require('../models/idempotency.model.js')
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000
-
-const requests = new Map()
 
 const buildRequestFingerprint = (req) => {
   const payload = {
@@ -19,8 +17,6 @@ const buildRequestFingerprint = (req) => {
     .digest('hex')
 }
 
-const createIdempotencyKey = () => uuidv4()
-
 const getIdempotencyKey = (req) => {
   const headerKey = req.get('Idempotency-Key')
 
@@ -28,91 +24,90 @@ const getIdempotencyKey = (req) => {
     return headerKey.trim()
   }
 
-  return createIdempotencyKey()
+  return null
 }
 
-const purgeExpiredEntries = () => {
-  const now = Date.now()
-
-  for (const [key, value] of requests.entries()) {
-    if (value.expiresAt <= now) {
-      requests.delete(key)
-    }
-  }
-}
-
-const getStoredRequest = (key) => {
-  const entry = requests.get(key)
-
+const normalizeEntry = (entry) => {
   if (!entry) {
     return null
   }
 
-  if (entry.expiresAt <= Date.now()) {
-    requests.delete(key)
-    return null
-  }
-
-  return entry
-}
-
-const startRequest = ({ key, fingerprint, ttlMs = DEFAULT_TTL_MS }) => {
-  purgeExpiredEntries()
-
-  const existingEntry = getStoredRequest(key)
-
-  if (existingEntry) {
-    return {
-      created: false,
-      entry: existingEntry
-    }
-  }
-
-  const entry = {
-    key,
-    fingerprint,
-    status: 'in_progress',
-    response: null,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + ttlMs
-  }
-
-  requests.set(key, entry)
+  const plainEntry = entry.toObject ? entry.toObject() : entry
 
   return {
-    created: true,
-    entry
+    ...plainEntry,
+    response: plainEntry.response
+      ? {
+          ...plainEntry.response,
+          headers:
+            plainEntry.response.headers instanceof Map
+              ? Object.fromEntries(plainEntry.response.headers)
+              : plainEntry.response.headers || {}
+        }
+      : null
   }
 }
 
-const completeRequest = ({ key, statusCode, headers, body, ttlMs = DEFAULT_TTL_MS }) => {
-  const entry = getStoredRequest(key)
+const startRequest = async ({ key, fingerprint, ttlMs = DEFAULT_TTL_MS, retryExpired = true }) => {
+  const expiresAt = new Date(Date.now() + ttlMs)
 
-  if (!entry) {
-    return null
+  try {
+    const entry = await idempotencyModel.create({
+      key,
+      fingerprint,
+      status: 'in_progress',
+      expiresAt
+    })
+
+    return {
+      created: true,
+      entry: normalizeEntry(entry)
+    }
+  } catch (error) {
+    if (error.code !== 11000) {
+      throw error
+    }
+
+    const entry = await idempotencyModel.findOne({ key })
+
+    if (entry?.expiresAt <= new Date() && retryExpired) {
+      await idempotencyModel.deleteOne({ _id: entry._id })
+      return startRequest({ key, fingerprint, ttlMs, retryExpired: false })
+    }
+
+    return {
+      created: false,
+      entry: normalizeEntry(entry)
+    }
   }
-
-  entry.status = 'completed'
-  entry.response = {
-    statusCode,
-    headers,
-    body
-  }
-  entry.expiresAt = Date.now() + ttlMs
-
-  return entry
 }
 
-const releaseRequest = (key) => {
-  requests.delete(key)
+const completeRequest = async ({ key, statusCode, headers, body, ttlMs = DEFAULT_TTL_MS }) => {
+  return idempotencyModel.findOneAndUpdate(
+    { key },
+    {
+      $set: {
+        status: 'completed',
+        response: {
+          statusCode,
+          headers,
+          body
+        },
+        expiresAt: new Date(Date.now() + ttlMs)
+      }
+    },
+    { new: true }
+  )
+}
+
+const releaseRequest = async (key) => {
+  await idempotencyModel.deleteOne({ key, status: 'in_progress' })
 }
 
 module.exports = {
   DEFAULT_TTL_MS,
   buildRequestFingerprint,
-  createIdempotencyKey,
   getIdempotencyKey,
-  getStoredRequest,
   startRequest,
   completeRequest,
   releaseRequest

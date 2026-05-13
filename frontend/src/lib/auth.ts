@@ -13,6 +13,7 @@ export type AuthUser = {
 export type LoginResponse = {
   user: AuthUser
   accessToken?: string
+  refreshToken?: string
 }
 
 export type MessageResponse = {
@@ -35,6 +36,7 @@ export type VerifyNewEmailResponse = {
 export type RegisterResponse = {
   message: string
   email: string
+  verificationToken?: string
 }
 
 export type VerifyOtpResponse = LoginResponse & {
@@ -49,6 +51,11 @@ export type ResetPasswordResponse = LoginResponse & {
 export type CurrentUserResponse = {
   user: AuthUser
   accessToken?: string
+  refreshToken?: string
+}
+
+export type GoogleHandoffResponse = LoginResponse & {
+  message: string
 }
 
 export type OrderHistoryItem = {
@@ -82,12 +89,61 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
 }
 
-let accessToken: string | null = null
+const ACCESS_TOKEN_STORAGE_KEY = "buybest.accessToken"
+const REFRESH_TOKEN_STORAGE_KEY = "buybest.refreshToken"
+const AUTH_USER_STORAGE_KEY = "buybest.authUser"
+
+const readStorageValue = (storage: Storage | undefined, key: string) => {
+  try {
+    return storage?.getItem(key) || null
+  } catch {
+    return null
+  }
+}
+
+const writeStorageValue = (
+  storage: Storage | undefined,
+  key: string,
+  value?: string | null
+) => {
+  try {
+    if (value) {
+      storage?.setItem(key, value)
+    } else {
+      storage?.removeItem(key)
+    }
+  } catch {
+    // Storage can be unavailable in private browsing or locked-down embeds.
+  }
+}
+
+let accessToken: string | null =
+  typeof window === "undefined"
+    ? null
+    : readStorageValue(window.sessionStorage, ACCESS_TOKEN_STORAGE_KEY)
+
+let refreshToken: string | null =
+  typeof window === "undefined"
+    ? null
+    : readStorageValue(window.localStorage, REFRESH_TOKEN_STORAGE_KEY)
 
 export const getAccessToken = () => accessToken
+export const getRefreshToken = () => refreshToken
 
 export const setAccessToken = (token?: string | null) => {
   accessToken = token || null
+
+  if (typeof window !== "undefined") {
+    writeStorageValue(window.sessionStorage, ACCESS_TOKEN_STORAGE_KEY, accessToken)
+  }
+}
+
+export const setRefreshToken = (token?: string | null) => {
+  refreshToken = token || null
+
+  if (typeof window !== "undefined") {
+    writeStorageValue(window.localStorage, REFRESH_TOKEN_STORAGE_KEY, refreshToken)
+  }
 }
 
 const authApi = axios.create({
@@ -120,12 +176,40 @@ const getApiErrorMessage = (
 }
 
 export const getStoredAuthUser = () => {
-  return null
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  try {
+    const storedUser = window.localStorage.getItem(AUTH_USER_STORAGE_KEY)
+    return storedUser ? (JSON.parse(storedUser) as AuthUser) : null
+  } catch {
+    return null
+  }
 }
 
-export const storeAuthUser = (_user: AuthUser) => {}
+export const storeAuthUser = (user: AuthUser) => {
+  if (typeof window === "undefined") {
+    return
+  }
 
-export const clearStoredAuthUser = () => {}
+  try {
+    window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user))
+  } catch {
+    // Ignore storage failures; in-memory auth still works for this tab.
+  }
+}
+
+export const clearStoredAuthUser = () => {
+  setAccessToken(null)
+  setRefreshToken(null)
+
+  if (typeof window === "undefined") {
+    return
+  }
+
+  writeStorageValue(window.localStorage, AUTH_USER_STORAGE_KEY, null)
+}
 
 const attachAccessToken = (config: InternalAxiosRequestConfig) => {
   const token = getAccessToken()
@@ -143,9 +227,13 @@ refreshApi.interceptors.request.use(attachAccessToken)
 export async function refreshSession() {
   if (!refreshRequest) {
     refreshRequest = refreshApi
-      .post<CurrentUserResponse>("/api/auth/refresh-token")
+      .post<CurrentUserResponse>("/api/auth/refresh-token", {
+        refreshToken: getRefreshToken(),
+      })
       .then((response) => {
         setAccessToken(response.data.accessToken)
+        setRefreshToken(response.data.refreshToken)
+        storeAuthUser(response.data.user)
       })
       .finally(() => {
         refreshRequest = null
@@ -200,6 +288,8 @@ export async function loginUser(email: string, password: string) {
     })
 
     setAccessToken(response.data.accessToken)
+    setRefreshToken(response.data.refreshToken)
+    storeAuthUser(response.data.user)
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Login failed. Please try again."))
@@ -261,6 +351,8 @@ export async function resetPassword(
     )
 
     setAccessToken(response.data.accessToken)
+    setRefreshToken(response.data.refreshToken)
+    storeAuthUser(response.data.user)
     return response.data
   } catch (error) {
     throw new Error(
@@ -269,14 +361,21 @@ export async function resetPassword(
   }
 }
 
-export async function verifyRegistrationOtp(email: string, otp: string) {
+export async function verifyRegistrationOtp(
+  email: string,
+  otp: string,
+  verificationToken: string
+) {
   try {
     const response = await authApi.post<VerifyOtpResponse>("/api/auth/verify-otp", {
       email,
       otp,
+      verificationToken,
     })
 
     setAccessToken(response.data.accessToken)
+    setRefreshToken(response.data.refreshToken)
+    storeAuthUser(response.data.user)
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to verify OTP."))
@@ -299,9 +398,31 @@ export async function fetchCurrentUser() {
   try {
     const response = await authApi.get<CurrentUserResponse>("/api/auth/me")
 
+    if (response.data.accessToken) {
+      setAccessToken(response.data.accessToken)
+    }
+    storeAuthUser(response.data.user)
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to load current user."))
+  }
+}
+
+export async function completeGoogleLogin(handoffToken: string) {
+  try {
+    const response = await authApi.post<GoogleHandoffResponse>(
+      "/api/auth/google/session",
+      { handoffToken }
+    )
+
+    setAccessToken(response.data.accessToken)
+    setRefreshToken(response.data.refreshToken)
+    storeAuthUser(response.data.user)
+    return response.data
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error, "Unable to complete Google login.")
+    )
   }
 }
 
@@ -317,7 +438,9 @@ export async function fetchOrderHistory() {
 
 export async function logoutUser() {
   try {
-    const response = await refreshApi.post<MessageResponse>("/api/auth/logout")
+    const response = await refreshApi.post<MessageResponse>("/api/auth/logout", {
+      refreshToken: getRefreshToken(),
+    })
 
     return response.data
   } catch (error) {

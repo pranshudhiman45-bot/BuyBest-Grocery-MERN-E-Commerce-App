@@ -66,9 +66,12 @@ Important variables:
 - `MONGO_URI`
 - `CORS_ORIGIN`
 - `FRONTEND_URL`
+- `BACKEND_URL`
 - `ACCESS_TOKEN_SECRET`
 - `REFRESH_TOKEN_SECRET`
 - `JWT_SECRET`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
 - `CLIENT_ID`
 - `CLIENT_SECRET`
 - `GOOGLE_CALLBACK_URL`
@@ -91,7 +94,10 @@ Current deployment example:
 ```env
 CORS_ORIGIN=https://buy-best-grocery-mern-e-commerce-ap.vercel.app,http://localhost:5173
 FRONTEND_URL=https://buy-best-grocery-mern-e-commerce-ap.vercel.app
+BACKEND_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com
 RESET_PASSWORD_URL=https://buy-best-grocery-mern-e-commerce-ap.vercel.app/reset-password
+GOOGLE_CLIENT_ID=your_google_login_client_id
+GOOGLE_CLIENT_SECRET=your_google_login_client_secret
 GOOGLE_CALLBACK_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com/api/auth/google/callback
 ```
 

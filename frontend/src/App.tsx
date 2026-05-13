@@ -14,6 +14,7 @@ import {
 } from "@/store/app-shell"
 import {
   clearStoredAuthUser,
+  completeGoogleLogin,
   fetchCurrentUser,
   getStoredAuthUser,
   logoutUser,
@@ -132,6 +133,7 @@ const App = () => {
   React.useEffect(() => {
     const clearGoogleAuthParams = (url: URL) => {
       url.searchParams.delete("googleAuth")
+      url.searchParams.delete("handoff")
       url.searchParams.delete("error")
       url.hash = ""
       window.history.replaceState(
@@ -144,6 +146,7 @@ const App = () => {
     const syncCurrentUser = async () => {
       const url = new URL(window.location.href)
       const googleAuthStatus = url.searchParams.get("googleAuth")
+      const googleAuthHandoff = url.searchParams.get("handoff")
       const googleAuthError =
         googleAuthStatus === "error" ? url.searchParams.get("error") : null
 
@@ -162,7 +165,10 @@ const App = () => {
       }
 
       try {
-        const response = await fetchCurrentUser()
+        const response =
+          googleAuthStatus === "success" && googleAuthHandoff
+            ? await completeGoogleLogin(googleAuthHandoff)
+            : await fetchCurrentUser()
         setCurrentUser(response.user)
         storeAuthUser(response.user)
 

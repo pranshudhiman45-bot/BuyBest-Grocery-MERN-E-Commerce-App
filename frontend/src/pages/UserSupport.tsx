@@ -68,7 +68,17 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
   const fetchTickets = async () => {
     try {
       const res = await supportApi.get("/api/support/my-tickets")
-      setTickets(res.data.tickets)
+      const nextTickets = res.data.tickets || []
+      setTickets(nextTickets)
+      setActiveTicket((current) => {
+        const activeTicketId = current?._id || activeTicketIdRef.current
+
+        if (!activeTicketId) {
+          return current
+        }
+
+        return nextTickets.find((ticket: Ticket) => ticket._id === activeTicketId) || current
+      })
     } catch (err) {
       console.error("Failed to fetch tickets", err)
     }
@@ -152,9 +162,10 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
     const socket = io(API_BASE_URL, {
       auth: provideSocketAuth,
       withCredentials: true,
-      transports: ["websocket"],
-      upgrade: false,
-      rememberUpgrade: true,
+      path: "/socket.io",
+      transports: ["polling", "websocket"],
+      upgrade: true,
+      rememberUpgrade: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -214,6 +225,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
     const handleConnect = () => {
       setIsChatConnected(true)
       setSendError("")
+      void fetchTickets()
       if (activeTicketIdRef.current) {
         socket.timeout(10000).emit("join_ticket", activeTicketIdRef.current, (error: Error | null, response?: JoinTicketAck) => {
           if (error || response?.ok === false) {

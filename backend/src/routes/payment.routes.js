@@ -80,7 +80,8 @@ router.post('/create-checkout-session', asyncHandler(async (req, res) => {
   const session = await createStripeCheckoutSession(req.user, {
     addressId,
     couponCode,
-    paymentMethod
+    paymentMethod,
+    idempotencyKey: req.idempotency?.key
   })
 
   res.status(200).json(session)

@@ -1,15 +1,15 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { formatPrice } from "@/lib/storefront"
 
 type UseCartCheckoutOptions = {
-  checkoutCart: (paymentMethod: string, couponCode?: string) => Promise<{
+  checkoutCart: (paymentMethod: string, couponCode?: string, idempotencyKey?: string) => Promise<{
     message: string
     summary: {
       total: number
     }
   }>
-  createOnlineCheckoutSession: (paymentMethod: string, couponCode?: string) => Promise<{
+  createOnlineCheckoutSession: (paymentMethod: string, couponCode?: string, idempotencyKey?: string) => Promise<{
     sessionId: string
     url: string | null
   }>
@@ -34,12 +34,27 @@ export function useCartCheckout({
     useState("credit_card")
   const [checkoutMessage, setCheckoutMessage] = useState("")
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const checkoutIdempotencyKeyRef = useRef<string | null>(null)
+
+  const createCheckoutIdempotencyKey = () => {
+    const randomValue =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+    return `checkout-${randomValue}`
+  }
 
   const handleCheckout = async (couponCode?: string) => {
+    const idempotencyKey =
+      checkoutIdempotencyKeyRef.current || createCheckoutIdempotencyKey()
+    checkoutIdempotencyKeyRef.current = idempotencyKey
+
     if (onBeforeCheckout) {
       const shouldContinue = await onBeforeCheckout()
 
       if (!shouldContinue) {
+        checkoutIdempotencyKeyRef.current = null
         return
       }
     }
@@ -48,7 +63,7 @@ export function useCartCheckout({
 
     try {
       if (selectedPaymentMethod === "cash_on_delivery") {
-        const response = await checkoutCart(selectedPaymentMethod, couponCode)
+        const response = await checkoutCart(selectedPaymentMethod, couponCode, idempotencyKey)
         setCheckoutMessage(
           getSuccessMessage
             ? getSuccessMessage(response)
@@ -57,10 +72,11 @@ export function useCartCheckout({
         if (onCheckoutSuccess) {
           onCheckoutSuccess(response)
         }
+        checkoutIdempotencyKeyRef.current = null
         return
       }
 
-      const session = await createOnlineCheckoutSession(selectedPaymentMethod, couponCode)
+      const session = await createOnlineCheckoutSession(selectedPaymentMethod, couponCode, idempotencyKey)
       if (!session.url) {
         throw new Error("Stripe checkout session was created without a redirect URL.")
       }
@@ -68,6 +84,7 @@ export function useCartCheckout({
       setCheckoutMessage("Redirecting to Stripe checkout...")
       window.location.assign(session.url)
     } catch (error) {
+      checkoutIdempotencyKeyRef.current = null
       setCheckoutMessage(
         error instanceof Error
           ? error.message

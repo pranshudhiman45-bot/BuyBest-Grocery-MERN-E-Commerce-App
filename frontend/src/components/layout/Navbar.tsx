@@ -271,6 +271,8 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
     }
   }
 
+  const canUseLocation = user?.role !== "support"
+
   return (
     <>
       <nav className="sticky top-0 z-40 border-b border-[#ece4d6] bg-[linear-gradient(180deg,rgba(255,252,246,0.96)_0%,rgba(250,247,241,0.94)_100%)] backdrop-blur">
@@ -432,17 +434,19 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
           </div>
 
           <div className="flex items-center gap-1.5 md:gap-2.5">
-            <Button
-              variant="ghost"
-              className="hidden h-10 items-center gap-2 rounded-full border border-[#ece4d6] bg-white px-3 text-[#7d6d52] hover:bg-[#faf4e8] md:flex"
-              title="Delivery location"
-              onClick={handleDetectLocation}
-            >
-              <MapPin className="h-4 w-4 text-[#a78410]" />
-              <span className="max-w-28 truncate text-sm font-medium">
-                {isLocating ? "Detecting..." : locationName}
-              </span>
-            </Button>
+            {canUseLocation ? (
+              <Button
+                variant="ghost"
+                className="hidden h-10 items-center gap-2 rounded-full border border-[#ece4d6] bg-white px-3 text-[#7d6d52] hover:bg-[#faf4e8] md:flex"
+                title="Delivery location"
+                onClick={handleDetectLocation}
+              >
+                <MapPin className="h-4 w-4 text-[#a78410]" />
+                <span className="max-w-28 truncate text-sm font-medium">
+                  {isLocating ? "Detecting..." : locationName}
+                </span>
+              </Button>
+            ) : null}
 
             {user?.role !== "support" ? (
               <Button
@@ -532,15 +536,17 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
 
         <div className="border-t border-[#efe5d6] px-3 pb-3 pt-2 lg:hidden">
           <div className="mx-auto flex max-w-[1380px] flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleDetectLocation}
-              disabled={isLocating}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#ece4d6] bg-white px-3 py-2 text-xs font-semibold text-[#7d6d52] transition hover:bg-[#faf4e8] disabled:opacity-70"
-            >
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-[#a78410]" />
-              <span className="truncate">{isLocating ? "Detecting..." : locationName}</span>
-            </button>
+            {canUseLocation ? (
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={isLocating}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#ece4d6] bg-white px-3 py-2 text-xs font-semibold text-[#7d6d52] transition hover:bg-[#faf4e8] disabled:opacity-70"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-[#a78410]" />
+                <span className="truncate">{isLocating ? "Detecting..." : locationName}</span>
+              </button>
+            ) : null}
             {user?.role !== "support" ? (
               <>
                 <button

@@ -33,14 +33,15 @@ const validateLoginPayload = ({ email, password }) => {
   }
 }
 
-const validateOtpPayload = ({ email, otp }) => {
-  if (!email || !otp) {
-    throw new AppError('Email and OTP are required', 400)
+const validateOtpPayload = ({ email, otp, verificationToken }) => {
+  if (!email || !otp || !verificationToken) {
+    throw new AppError('Email, OTP, and verification session are required', 400)
   }
 
   return {
     email: normalizeEmail(email),
-    otp: String(otp).trim()
+    otp: String(otp).trim(),
+    verificationToken: String(verificationToken).trim()
   }
 }
 

@@ -3,6 +3,9 @@ const AppError = require('../utils/app-error.js')
 const addressModel = require('../models/address.model.js')
 const userModel = require('../models/user.model.js')
 
+const MAX_ADDRESSES_PER_USER = 5
+const ADDRESS_LIMIT_MESSAGE = 'You can only add 5 addresses. Delete one to add a new address.'
+
 const normalizeAddress = (address, selectedAddressId) => ({
   id: address._id.toString(),
   addressLine: address.addresLine,
@@ -148,6 +151,11 @@ const createAddress = asyncHandler(async (req, res) => {
   const { setAsDefault = false } = req.body
   const normalizedPayload = validateAddressPayload(req.body)
   const existingAddressCount = await addressModel.countDocuments({ user: req.user._id })
+
+  if (existingAddressCount >= MAX_ADDRESSES_PER_USER) {
+    throw new AppError(ADDRESS_LIMIT_MESSAGE, 400)
+  }
+
   const shouldSetDefault = setAsDefault || existingAddressCount === 0
 
   const address = await addressModel.create({

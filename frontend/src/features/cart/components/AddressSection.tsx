@@ -37,6 +37,9 @@ const initialFormState: AddressFormState = {
   setAsDefault: true,
 }
 
+const MAX_ADDRESSES = 5
+const ADDRESS_LIMIT_MESSAGE = "You can only add 5 addresses. Delete one to add a new address."
+
 export function AddressSection({
   isLoggedIn,
   onRequireLogin,
@@ -159,6 +162,11 @@ export function AddressSection({
   }
 
   const handleCreateOrUpdateAddress = async () => {
+    if (!editingAddressId && addresses.length >= MAX_ADDRESSES) {
+      setFeedback(ADDRESS_LIMIT_MESSAGE)
+      return
+    }
+
     setIsSubmitting(true)
     setFeedback("")
 
@@ -260,6 +268,7 @@ export function AddressSection({
         <h2 className="mt-1 text-2xl font-semibold text-[#2c2417]">Choose where this order should go</h2>
         <p className="mt-1 text-sm text-[#7d6d52]">
           Add a new address or select an existing one. Your selected address will be used at checkout.
+          You can save up to {MAX_ADDRESSES} addresses.
         </p>
       </div>
 

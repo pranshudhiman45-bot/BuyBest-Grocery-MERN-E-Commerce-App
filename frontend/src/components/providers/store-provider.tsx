@@ -57,7 +57,11 @@ type StoreContextValue = {
   updateCartQuantity: (productId: string, quantity: number) => Promise<void>
   removeFromCart: (productId: string) => Promise<void>
   searchProducts: (query: string) => Promise<Product[]>
-  checkoutCart: (paymentMethod: string, couponCode?: string) => Promise<CheckoutResponse>
+  checkoutCart: (
+    paymentMethod: string,
+    couponCode?: string,
+    idempotencyKey?: string
+  ) => Promise<CheckoutResponse>
 }
 
 const emptySummary: CartSummary = {
@@ -465,8 +469,12 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const searchProducts = useCallback(async (query: string) => searchProductsApi(query), [])
 
-  const checkoutCart = useCallback(async (paymentMethod: string, couponCode?: string) => {
-    const response = await checkoutCartApi(paymentMethod, couponCode)
+  const checkoutCart = useCallback(async (
+    paymentMethod: string,
+    couponCode?: string,
+    idempotencyKey?: string
+  ) => {
+    const response = await checkoutCartApi(paymentMethod, couponCode, idempotencyKey)
 
     if (currentUser) {
       await refreshCart()

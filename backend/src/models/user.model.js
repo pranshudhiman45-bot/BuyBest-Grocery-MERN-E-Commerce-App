@@ -102,6 +102,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    otpSessionToken: {
+      type: String,
+      select: false,
+      default: null
+    },
     resetPasswordToken: {
       type: String,
       select: false,
@@ -110,6 +115,15 @@ const userSchema = new mongoose.Schema(
     refreshToken: {
       type: String,
       select: false,
+      default: null
+    },
+    authHandoffToken: {
+      type: String,
+      select: false,
+      default: null
+    },
+    authHandoffExpiresAt: {
+      type: Date,
       default: null
     },
     resetPasswordExpiresAt: {

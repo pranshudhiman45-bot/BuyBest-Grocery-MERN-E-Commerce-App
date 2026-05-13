@@ -50,6 +50,7 @@ export function LoginForm({
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [otp, setOtp] = React.useState("")
+  const [verificationToken, setVerificationToken] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [confirmPassword, setConfirmPassword] = React.useState("")
   const [error, setError] = React.useState(initialError)
@@ -68,7 +69,11 @@ export function LoginForm({
         const response = await forgotPassword(email)
         setSuccessMessage(response.message)
       } else if (mode === "verify-otp") {
-        const response = await verifyRegistrationOtp(email, otp)
+        if (!verificationToken) {
+          throw new Error("Please request a new OTP before verifying your email.")
+        }
+
+        const response = await verifyRegistrationOtp(email, otp, verificationToken)
         storeAuthUser(response.user)
         onAuthenticated?.(response.user)
       } else if (mode === "signup") {
@@ -79,6 +84,7 @@ export function LoginForm({
           confirmPassword
         )
         setSuccessMessage(response.message)
+        setVerificationToken(response.verificationToken || "")
         setMode("verify-otp")
         setOtp("")
         setPassword("")
@@ -114,6 +120,7 @@ export function LoginForm({
   const switchToForgotPassword = () => {
     setMode("forgot-password")
     setOtp("")
+    setVerificationToken("")
     setPassword("")
     setConfirmPassword("")
     setError("")
@@ -123,6 +130,7 @@ export function LoginForm({
   const switchToLogin = () => {
     setMode("login")
     setOtp("")
+    setVerificationToken("")
     setError("")
     setSuccessMessage("")
   }
@@ -130,14 +138,9 @@ export function LoginForm({
   const switchToSignup = () => {
     setMode("signup")
     setOtp("")
+    setVerificationToken("")
     setPassword("")
     setConfirmPassword("")
-    setError("")
-    setSuccessMessage("")
-  }
-
-  const switchToVerifyOtp = () => {
-    setMode("verify-otp")
     setError("")
     setSuccessMessage("")
   }
@@ -154,6 +157,8 @@ export function LoginForm({
 
     try {
       const response = await resendRegistrationOtp(email)
+      setVerificationToken(response.verificationToken || "")
+      setOtp("")
       setMode("verify-otp")
       setSuccessMessage(response.message)
     } catch (resendError) {
@@ -350,16 +355,6 @@ export function LoginForm({
                         className="text-primary underline-offset-4 hover:underline"
                       >
                         Sign up
-                      </button>
-                    </div>
-                    <div className="text-sm">
-                      Already have an OTP?{" "}
-                      <button
-                        type="button"
-                        onClick={switchToVerifyOtp}
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        Verify email
                       </button>
                     </div>
                   </>

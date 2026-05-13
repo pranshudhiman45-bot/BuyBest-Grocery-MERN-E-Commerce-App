@@ -47,22 +47,26 @@ if (nodeEnv === 'production') {
 
 const frontendUrl =
   process.env.FRONTEND_URL || corsOrigins[0] || 'http://localhost:5173'
+const backendUrl =
+  process.env.BACKEND_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  `http://localhost:${Number(process.env.PORT) || 3000}`
 
 module.exports = {
   nodeEnv,
   isRender,
   port: Number(process.env.PORT) || 3000,
   frontendUrl,
+  backendUrl,
   mongoUri: process.env.MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
   accessTokenSecret,
   refreshTokenSecret,
   corsOrigins,
-  clientId: process.env.CLIENT_ID,
-  clientSecret: process.env.CLIENT_SECRET,
-  emailClientId: process.env.EMAIL_CLIENT_ID || process.env.CLIENT_ID,
-  emailClientSecret:
-    process.env.EMAIL_CLIENT_SECRET || process.env.CLIENT_SECRET,
+  clientId: process.env.GOOGLE_CLIENT_ID || process.env.CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.CLIENT_SECRET,
+  emailClientId: process.env.EMAIL_CLIENT_ID,
+  emailClientSecret: process.env.EMAIL_CLIENT_SECRET,
   emailAccessToken: process.env.EMAIL_ACCESS_TOKEN,
   emailRefreshToken:
     process.env.EMAIL_REFRESH_TOKEN ||
@@ -77,7 +81,8 @@ module.exports = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   googleCallbackUrl:
-    process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback',
+    process.env.GOOGLE_CALLBACK_URL ||
+    `${backendUrl.replace(/\/$/, '')}/api/auth/google/callback`,
   otpExpiryMinutes: Number(process.env.OTP_EXPIRY_MINUTES || 10),
   resetPasswordExpiryMinutes: Number(
     process.env.RESET_PASSWORD_EXPIRY_MINUTES || 15

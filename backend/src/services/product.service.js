@@ -74,6 +74,9 @@ const ensureStorefrontSeeded = async () => {
 const buildProductPayload = (input = {}, existingProduct = null) => {
   const baseName = String(input.name || existingProduct?.name || '').trim()
   const slugSource = String(input.slug || baseName || existingProduct?.slug || '').trim()
+  const categorySource = String(
+    input.category || input.categoryLabel || existingProduct?.category || ''
+  ).trim()
   const images = normalizeImageInput(input.images ?? existingProduct?.images ?? [])
   const accent = String(input.accent || existingProduct?.accent || '#9CD56A').trim()
   const imageLabel = String(input.imageLabel || existingProduct?.imageLabel || baseName || 'Product image').trim()
@@ -82,8 +85,8 @@ const buildProductPayload = (input = {}, existingProduct = null) => {
     slug: slugify(slugSource),
     name: baseName,
     brand: String(input.brand || '').trim(),
-    category: String(input.category || '').trim(),
-    categoryLabel: String(input.categoryLabel || input.category || '').trim(),
+    category: slugify(categorySource),
+    categoryLabel: String(input.categoryLabel || input.category || existingProduct?.categoryLabel || '').trim(),
     size: String(input.size || '').trim(),
     price: Number(input.price) || 0,
     originalPrice:
@@ -130,8 +133,8 @@ const mapProductToStorefront = (productDocument) => {
     id: product.slug,
     name: product.name,
     brand: product.brand,
-    category: product.category,
-    categoryLabel: product.categoryLabel,
+    category: slugify(product.category || product.categoryLabel),
+    categoryLabel: product.categoryLabel || product.category,
     size: product.size,
     price: product.price,
     originalPrice: product.originalPrice || undefined,
