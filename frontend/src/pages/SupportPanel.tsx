@@ -128,32 +128,60 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
     const socket = io(API_BASE_URL, { withCredentials: true })
     socketRef.current = socket
 
-    socket.on("receive_message", (message: IncomingMessage) => {
+    const handleIncomingMessage = (message: IncomingMessage) => {
       setTickets((prev) =>
-        prev.map((ticket) =>
-          ticket._id === message.ticketId
-            ? { ...ticket, messages: [...ticket.messages, message] }
-            : ticket
-        )
+        prev.map((ticket) => {
+          if (ticket._id !== message.ticketId) {
+            return ticket
+          }
+
+          const alreadyExists = ticket.messages.some(
+            (msg) =>
+              msg._id && message._id
+                ? msg._id === message._id
+                : msg.createdAt === message.createdAt &&
+                  msg.text === message.text &&
+                  getMessageSenderId(msg) === getMessageSenderId(message)
+          )
+
+          if (alreadyExists) {
+            return ticket
+          }
+
+          return {
+            ...ticket,
+            messages: [...ticket.messages, message],
+          }
+        })
       )
 
       setActiveTicket((prev) => {
-        if (!prev) {
+        if (!prev || !message.ticketId || prev._id !== message.ticketId) {
           return prev
         }
 
-        if (message.ticketId && prev._id !== message.ticketId) {
+        const alreadyExists = prev.messages.some(
+          (msg) =>
+            msg._id && message._id
+              ? msg._id === message._id
+              : msg.createdAt === message.createdAt &&
+                msg.text === message.text &&
+                getMessageSenderId(msg) === getMessageSenderId(message)
+        )
+
+        if (alreadyExists) {
           return prev
         }
 
-        if (!message.ticketId) {
-          return prev
+        return {
+          ...prev,
+          messages: [...prev.messages, message],
         }
-
-        const messages = [...prev.messages, message]
-        return { ...prev, messages }
       })
-    })
+    }
+
+    socket.on("receive_message", handleIncomingMessage)
+    socket.on("support_receive_message", handleIncomingMessage)
 
     socket.on("new_ticket", (ticket: Ticket) => {
       setTickets((prev) => {
@@ -164,6 +192,8 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
     })
 
     return () => {
+      socket.off("receive_message", handleIncomingMessage)
+      socket.off("support_receive_message", handleIncomingMessage)
       socket.disconnect()
     }
   }, [])

@@ -105,6 +105,7 @@ const setupSocket = (server) => {
 
     if (socket.user?.role === USER_ROLES.SUPPORT) {
       socket.join(SUPPORT_ROOM)
+      console.log(`Support agent joined support room: ${socket.id}`)
     }
 
     socket.on('join_ticket', async (ticketId) => {
@@ -126,7 +127,6 @@ const setupSocket = (server) => {
           return
         }
 
-        socket.leave(ticketId)
         socket.join(ticketId)
         console.log(`Socket ${socket.id} joined ticket ${ticketId}`)
       } catch (error) {
@@ -171,10 +171,24 @@ const setupSocket = (server) => {
 
         const savedMessage = ticket.messages[ticket.messages.length - 1]
 
-        io.to(ticketId).emit('receive_message', {
+        // Ensure support agents are always inside the support room
+        if (socket.user?.role === USER_ROLES.SUPPORT) {
+          socket.join(SUPPORT_ROOM)
+        }
+
+        // Ensure the sender socket is also inside the ticket room
+        socket.join(ticketId)
+
+        const formattedMessage = {
           ...formatMessage(savedMessage),
           ticketId
-        })
+        }
+
+        // Send message to everyone inside the ticket room
+        io.to(ticketId).emit('receive_message', formattedMessage)
+
+        // Also notify support dashboard listeners
+        io.to(SUPPORT_ROOM).emit('support_receive_message', formattedMessage)
       } catch (err) {
         console.error('Error saving message:', err)
       }
