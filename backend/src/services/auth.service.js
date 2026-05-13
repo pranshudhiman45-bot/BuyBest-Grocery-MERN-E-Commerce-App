@@ -99,6 +99,19 @@ const getCurrentUser = async (user) => ({
   }
 })
 
+const getSocketToken = async user => {
+  if (!user?._id) {
+    throw new AppError('Authenticated user not found', 401)
+  }
+
+  return {
+    statusCode: 200,
+    body: {
+      token: createAccessToken(user._id)
+    }
+  }
+}
+
 const verifyRegistrationOtp = async (body, res) => {
   const { email, otp } = validateOtpPayload(body)
   const user = await userModel.findOne({ email }).select('+password +otpCode')
@@ -654,6 +667,7 @@ const verifyNewPassword = async (user, body) => {
 module.exports = {
   registerUser,
   getCurrentUser,
+  getSocketToken,
   verifyRegistrationOtp,
   resendRegistrationOtp,
   forgotPassword,

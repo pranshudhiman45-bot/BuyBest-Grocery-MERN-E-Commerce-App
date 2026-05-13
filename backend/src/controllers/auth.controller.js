@@ -129,6 +129,11 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   res.status(response.statusCode).json(response.body)
 })
 
+const getSocketToken = asyncHandler(async (req, res) => {
+  const response = await authService.getSocketToken(req.user)
+  res.status(response.statusCode).json(response.body)
+})
+
 const verifyRegistrationOtp = asyncHandler(async (req, res) => {
   const response = await authService.verifyRegistrationOtp(req.body, res)
   res.status(response.statusCode).json(response.body)
@@ -207,6 +212,7 @@ module.exports = {
   googleAuthFailure,
   registerUser,
   getCurrentUser,
+  getSocketToken,
   verifyRegistrationOtp,
   resendRegistrationOtp,
   forgotPassword,

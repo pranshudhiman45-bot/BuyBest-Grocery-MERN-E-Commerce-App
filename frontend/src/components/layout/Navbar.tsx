@@ -444,17 +444,19 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
               </span>
             </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-10 w-10 rounded-full border border-[#ece4d6] bg-white text-[#624c11] hover:bg-[#faf4e8]"
-              onClick={() => dispatch(appShellActions.openCart())}
-            >
-              <ShoppingCart className="h-4.5 w-4.5" />
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ffd24a] px-1 text-[10px] font-bold text-black shadow-sm">
-                {cartSummary.itemCount}
-              </span>
-            </Button>
+            {user?.role !== "support" ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-10 w-10 rounded-full border border-[#ece4d6] bg-white text-[#624c11] hover:bg-[#faf4e8]"
+                onClick={() => dispatch(appShellActions.openCart())}
+              >
+                <ShoppingCart className="h-4.5 w-4.5" />
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ffd24a] px-1 text-[10px] font-bold text-black shadow-sm">
+                  {cartSummary.itemCount}
+                </span>
+              </Button>
+            ) : null}
 
             {!user ? (
               <Button

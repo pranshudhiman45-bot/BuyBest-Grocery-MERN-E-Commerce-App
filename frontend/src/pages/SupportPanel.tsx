@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AuthUser } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api-config";
+import { provideSocketAuth } from "@/lib/socket-auth";
 import { supportApi } from "@/lib/support-api";
 
 type Message = {
@@ -180,6 +181,7 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
   useEffect(() => {
     const socket = io(API_BASE_URL, {
+      auth: provideSocketAuth,
       withCredentials: true,
       transports: ["websocket"],
       upgrade: false,
