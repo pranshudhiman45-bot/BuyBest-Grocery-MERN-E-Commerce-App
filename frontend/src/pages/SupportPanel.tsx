@@ -168,10 +168,13 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
   useEffect(() => {
     const socket = io(API_BASE_URL, {
       withCredentials: true,
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      forceNew: true,
     })
     socketRef.current = socket
 
@@ -188,10 +191,10 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
       }
     }
 
-    const handleDisconnect = () => {
+    const handleDisconnect = (reason: string) => {
       setIsChatConnected(false)
       setIsSendingMessage(false)
-      console.log("Support socket disconnected")
+      console.log("Support socket disconnected", reason)
     }
 
     const handleConnectError = (error: Error) => {
@@ -199,6 +202,7 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
       setSendError(error.message || "Unable to connect to support chat.")
       console.error("Support socket connection failed", error)
       console.log("Socket URL:", API_BASE_URL)
+      console.log("Socket transport:", socket.io.engine.transport.name)
     }
 
     const handleIncomingMessage = (message: IncomingMessage) => {
