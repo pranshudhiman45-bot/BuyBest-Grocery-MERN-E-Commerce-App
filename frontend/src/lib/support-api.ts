@@ -1,7 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from "axios"
 
 import { API_BASE_URL } from "@/lib/api-config"
-import { clearStoredAuthUser, refreshSession } from "@/lib/auth"
+import { clearStoredAuthUser, getAccessToken, refreshSession } from "@/lib/auth"
 
 type ApiErrorResponse = {
   message?: string
@@ -17,6 +17,16 @@ export const supportApi = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+})
+
+supportApi.interceptors.request.use((config) => {
+  const token = getAccessToken()
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
 })
 
 supportApi.interceptors.response.use(

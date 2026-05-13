@@ -12,6 +12,7 @@ export type AuthUser = {
 
 export type LoginResponse = {
   user: AuthUser
+  accessToken?: string
 }
 
 export type MessageResponse = {
@@ -47,6 +48,7 @@ export type ResetPasswordResponse = LoginResponse & {
 
 export type CurrentUserResponse = {
   user: AuthUser
+  accessToken?: string
 }
 
 type ApiErrorResponse = {
@@ -55,6 +57,14 @@ type ApiErrorResponse = {
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean
+}
+
+let accessToken: string | null = null
+
+export const getAccessToken = () => accessToken
+
+export const setAccessToken = (token?: string | null) => {
+  accessToken = token || null
 }
 
 const authApi = axios.create({
@@ -94,11 +104,26 @@ export const storeAuthUser = (_user: AuthUser) => {}
 
 export const clearStoredAuthUser = () => {}
 
+const attachAccessToken = (config: InternalAxiosRequestConfig) => {
+  const token = getAccessToken()
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
+}
+
+authApi.interceptors.request.use(attachAccessToken)
+refreshApi.interceptors.request.use(attachAccessToken)
+
 export async function refreshSession() {
   if (!refreshRequest) {
     refreshRequest = refreshApi
       .post<CurrentUserResponse>("/api/auth/refresh-token")
-      .then(() => undefined)
+      .then((response) => {
+        setAccessToken(response.data.accessToken)
+      })
       .finally(() => {
         refreshRequest = null
       })
@@ -151,6 +176,7 @@ export async function loginUser(email: string, password: string) {
       password,
     })
 
+    setAccessToken(response.data.accessToken)
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Login failed. Please try again."))
@@ -211,6 +237,7 @@ export async function resetPassword(
       }
     )
 
+    setAccessToken(response.data.accessToken)
     return response.data
   } catch (error) {
     throw new Error(
@@ -226,6 +253,7 @@ export async function verifyRegistrationOtp(email: string, otp: string) {
       otp,
     })
 
+    setAccessToken(response.data.accessToken)
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to verify OTP."))
@@ -262,6 +290,7 @@ export async function logoutUser() {
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to log out."))
   } finally {
+    setAccessToken(null)
     clearStoredAuthUser()
   }
 }
@@ -314,4 +343,3 @@ export async function verifyNewPasswordOtp(otp: string, newPassword: string) {
     throw new Error(getApiErrorMessage(error, "Unable to verify your new password."))
   }
 }
-

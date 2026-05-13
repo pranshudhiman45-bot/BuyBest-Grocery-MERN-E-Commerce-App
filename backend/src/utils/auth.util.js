@@ -85,8 +85,9 @@ const buildUserResponse = user => ({
   avatar: user.avatar
 })
 
-const buildAuthResponse = (user) => ({
-  user: buildUserResponse(user)
+const buildAuthResponse = (user, tokens = {}) => ({
+  user: buildUserResponse(user),
+  ...(tokens.accessToken ? { accessToken: tokens.accessToken } : {})
 })
 
 module.exports = {
