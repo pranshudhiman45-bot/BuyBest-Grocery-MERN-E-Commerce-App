@@ -257,14 +257,14 @@ const ProductCard = React.memo(function ProductCard({
           ) : null}
 
           <motion.div
-            className="flex h-20 w-full max-w-44 items-center justify-center sm:h-24"
+            className="flex h-28 w-full max-w-44 items-center justify-center sm:h-32"
             whileHover={{ scale: 1.05, rotate: -1.5 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
           >
             <ImagePlaceholder
               label={product.imageLabel}
               src={product.images?.[0]}
-              className="mx-auto h-16 w-16 bg-white sm:h-19 sm:w-19"
+              className="mx-auto h-24 w-24 bg-white sm:h-28 sm:w-28"
             />
           </motion.div>
         </div>
