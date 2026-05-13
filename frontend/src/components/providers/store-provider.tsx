@@ -234,8 +234,30 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const [taxPercentage, setTaxPercentage] = useState(DEFAULT_TAX_PERCENTAGE)
   const [isCartLoading, setIsCartLoading] = useState(true)
   const [isFreeDeliveryPopupOpen, setIsFreeDeliveryPopupOpen] = useState(false)
+  const [cartToastMessage, setCartToastMessage] = useState("")
   const previousSubtotalRef = useRef(0)
   const hasHydratedCartRef = useRef(false)
+  const cartToastTimeoutRef = useRef<number | null>(null)
+
+  const showCartToast = useCallback((message = "Item added to cart") => {
+    if (cartToastTimeoutRef.current) {
+      window.clearTimeout(cartToastTimeoutRef.current)
+    }
+
+    setCartToastMessage(message)
+    cartToastTimeoutRef.current = window.setTimeout(() => {
+      setCartToastMessage("")
+      cartToastTimeoutRef.current = null
+    }, 2200)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (cartToastTimeoutRef.current) {
+        window.clearTimeout(cartToastTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const syncCartState = useCallback((data: { items: CartItem[]; summary: CartSummary }) => {
     const previousSubtotal = previousSubtotalRef.current
@@ -348,6 +370,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       try {
         const data = await addCartItemApi(productId, quantity)
         syncCartState(data)
+        showCartToast()
         return
       } catch (error) {
         if (!isUnauthorizedError(error)) {
@@ -380,7 +403,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (actualQuantity < requestedGuestQuantity) {
       throw new Error(buildGuestQuantityLimitMessage(cartItem))
     }
-  }, [assertWithinProductLimit, cartItems, currentUser, syncCartState, taxPercentage])
+    showCartToast()
+  }, [assertWithinProductLimit, cartItems, currentUser, showCartToast, syncCartState, taxPercentage])
 
   const updateCartQuantity = useCallback(async (productId: string, quantity: number) => {
     await assertWithinProductLimit(productId, quantity)
@@ -495,6 +519,16 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   return (
     <StoreContext.Provider value={value}>
       {children}
+      {cartToastMessage ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-[130] flex justify-center px-4 sm:bottom-7">
+          <div className="pointer-events-auto flex max-w-sm items-center gap-3 rounded-full border border-[#d7eadf] bg-white px-4 py-3 text-sm font-semibold text-[#1B4D3E] shadow-[0_16px_40px_rgba(27,77,62,0.18)]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1B4D3E] text-xs font-bold text-white">
+              OK
+            </span>
+            <span>{cartToastMessage}</span>
+          </div>
+        </div>
+      ) : null}
       {isFreeDeliveryPopupOpen ? (
         <div className="fixed inset-0 z-[140] flex items-center justify-center bg-[#2c2417]/35 px-4 backdrop-blur-sm">
           <div
