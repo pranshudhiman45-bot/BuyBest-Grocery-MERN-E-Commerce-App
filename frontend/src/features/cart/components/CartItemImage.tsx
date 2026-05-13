@@ -27,7 +27,9 @@ export function CartItemImage({
         <img
           src={src}
           alt={label}
-          className="h-full w-full rounded-[20px] object-cover"
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full rounded-[inherit] object-cover"
         />
       ) : (
         <div

@@ -42,6 +42,16 @@ const formatTicket = (ticket) => ({
   messages: (ticket.messages || []).map(formatMessage)
 })
 
+const getBoundedLimit = (value, fallback, max) => {
+  const parsed = Number.parseInt(value, 10)
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.min(parsed, max)
+}
+
 const createTicket = async (req, res, next) => {
   try {
     const { title, description } = req.body
@@ -74,10 +84,12 @@ const createTicket = async (req, res, next) => {
 
 const getUserTickets = async (req, res, next) => {
   try {
+    const limit = getBoundedLimit(req.query.limit, 50, 100)
     const tickets = await ticketModel
       .find({ user: req.user._id })
       .populate(senderPopulate)
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
     
     res.status(200).json({
       success: true,
@@ -90,11 +102,13 @@ const getUserTickets = async (req, res, next) => {
 
 const getAllTickets = async (req, res, next) => {
   try {
+    const limit = getBoundedLimit(req.query.limit, 100, 200)
     // Both Open and Closed
     const tickets = await ticketModel
       .find()
       .populate([userPopulate, senderPopulate])
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
     
     res.status(200).json({
       success: true,
@@ -137,6 +151,16 @@ const closeTicket = async (req, res, next) => {
 
     if (!ticket) {
       return res.status(404).json({ success: false, message: 'Ticket not found' })
+    }
+
+    try {
+      const { getIO } = require('../socket.js')
+      getIO().to(ticket._id.toString()).to(SUPPORT_ROOM).emit('ticket_closed', {
+        ticketId: ticket._id.toString(),
+        status: ticket.status
+      })
+    } catch (socketErr) {
+      console.error('Socket close-ticket emission failed', socketErr)
     }
 
     res.status(200).json({

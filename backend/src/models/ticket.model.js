@@ -40,6 +40,10 @@ const ticketSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
+ticketSchema.index({ user: 1, updatedAt: -1 })
+ticketSchema.index({ status: 1, updatedAt: -1 })
+ticketSchema.index({ updatedAt: -1 })
+
 const ticketModel = mongoose.model('ticket', ticketSchema)
 
 module.exports = ticketModel

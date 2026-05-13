@@ -66,6 +66,8 @@ const ImagePlaceholder = ({
       <img
         src={src}
         alt={label}
+        loading="lazy"
+        decoding="async"
         className={[
           fit === "contain"
             ? "h-full w-full rounded-[24px] object-contain"

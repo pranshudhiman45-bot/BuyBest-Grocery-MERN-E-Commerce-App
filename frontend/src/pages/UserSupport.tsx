@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from "react"
-import axios from "axios"
 import { io, Socket } from "socket.io-client"
 import { ArrowLeft, Clock, MessageSquare, Send, Tag, Ticket as TicketIcon, LifeBuoy } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { AuthUser } from "@/lib/auth"
 import { API_BASE_URL } from "@/lib/api-config"
+import { supportApi } from "@/lib/support-api"
 
 type Message = {
   _id?: string
@@ -20,6 +20,13 @@ type Message = {
 type IncomingMessage = Message & {
   ticketId?: string
 }
+
+type SendMessageAck = {
+  ok?: boolean
+  error?: string
+}
+
+type JoinTicketAck = SendMessageAck
 
 type Ticket = {
   _id: string
@@ -48,16 +55,18 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
   const [newTitle, setNewTitle] = useState("")
   const [newDescription, setNewDescription] = useState("")
   const [chatMessage, setChatMessage] = useState("")
+  const [sendError, setSendError] = useState("")
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isChatConnected, setIsChatConnected] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   const socketRef = useRef<Socket | null>(null)
   const chatBottomRef = useRef<HTMLDivElement | null>(null)
+  const activeTicketIdRef = useRef<string | null>(null)
 
   const fetchTickets = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/support/my-tickets`, {
-        withCredentials: true,
-      })
+      const res = await supportApi.get("/api/support/my-tickets")
       setTickets(res.data.tickets)
     } catch (err) {
       console.error("Failed to fetch tickets", err)
@@ -70,11 +79,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
     setIsSubmitting(true)
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/support`,
-        { title: newTitle, description: newDescription },
-        { withCredentials: true }
-      )
+      await supportApi.post("/api/support", { title: newTitle, description: newDescription })
       setNewTitle("")
       setNewDescription("")
       fetchTickets()
@@ -87,8 +92,13 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
   const joinTicketChat = (ticket: Ticket) => {
     setActiveTicket(ticket)
-    if (socketRef.current) {
-      socketRef.current.emit("join_ticket", ticket._id)
+    setSendError("")
+    if (socketRef.current?.connected) {
+      socketRef.current.timeout(10000).emit("join_ticket", ticket._id, (error: Error | null, response?: JoinTicketAck) => {
+        if (error || response?.ok === false) {
+          setSendError(response?.error || "Unable to join this ticket chat.")
+        }
+      })
     }
   }
 
@@ -96,31 +106,73 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
     e.preventDefault()
     if (!chatMessage.trim() || !activeTicket || !currentUser) return
 
-    if (socketRef.current) {
-      socketRef.current.emit("send_message", {
-        ticketId: activeTicket._id,
-        senderId: currentUser.id,
-        text: chatMessage,
-      })
-      setChatMessage("")
+    const socket = socketRef.current
+    if (!socket?.connected) {
+      setSendError("Chat is still connecting. Please try again in a moment.")
+      return
     }
+
+    const messageText = chatMessage.trim()
+    setSendError("")
+    setIsSendingMessage(true)
+
+    socket.timeout(10000).emit(
+      "send_message",
+      {
+        ticketId: activeTicket._id,
+        text: messageText,
+      },
+      (error: Error | null, response?: SendMessageAck) => {
+        setIsSendingMessage(false)
+
+        if (error || !response?.ok) {
+          setSendError(response?.error || "Message timed out. Please try again.")
+          return
+        }
+
+        setChatMessage("")
+      }
+    )
   }
 
   useEffect(() => {
-    fetchTickets()
+    const timer = window.setTimeout(() => {
+      void fetchTickets()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    activeTicketIdRef.current = activeTicket?._id || null
+  }, [activeTicket?._id])
 
   useEffect(() => {
     const socket = io(API_BASE_URL, { withCredentials: true })
     socketRef.current = socket
 
-    socket.on("receive_message", (message: IncomingMessage) => {
+    const handleIncomingMessage = (message: IncomingMessage) => {
       setTickets((prev) =>
-        prev.map((ticket) =>
-          ticket._id === message.ticketId
-            ? { ...ticket, messages: [...ticket.messages, message] }
-            : ticket
-        )
+        prev.map((ticket) => {
+          if (ticket._id !== message.ticketId) {
+            return ticket
+          }
+
+          const alreadyExists = ticket.messages.some(
+            (msg) =>
+              msg._id && message._id
+                ? msg._id === message._id
+                : msg.createdAt === message.createdAt &&
+                  msg.text === message.text &&
+                  getMessageSenderId(msg) === getMessageSenderId(message)
+          )
+
+          if (alreadyExists) {
+            return ticket
+          }
+
+          return { ...ticket, messages: [...ticket.messages, message] }
+        })
       )
 
       setActiveTicket((prev) => {
@@ -128,12 +180,73 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
         if (message.ticketId && prev._id !== message.ticketId) return prev
         if (!message.ticketId) return prev
 
+        const alreadyExists = prev.messages.some(
+          (msg) =>
+            msg._id && message._id
+              ? msg._id === message._id
+              : msg.createdAt === message.createdAt &&
+                msg.text === message.text &&
+                getMessageSenderId(msg) === getMessageSenderId(message)
+        )
+
+        if (alreadyExists) {
+          return prev
+        }
+
         const messages = [...prev.messages, message]
         return { ...prev, messages }
       })
-    })
+    }
+
+    const handleConnect = () => {
+      setIsChatConnected(true)
+      setSendError("")
+      if (activeTicketIdRef.current) {
+        socket.timeout(10000).emit("join_ticket", activeTicketIdRef.current, (error: Error | null, response?: JoinTicketAck) => {
+          if (error || response?.ok === false) {
+            setSendError(response?.error || "Unable to rejoin this ticket chat.")
+          }
+        })
+      }
+    }
+
+    const handleDisconnect = () => {
+      setIsChatConnected(false)
+      setIsSendingMessage(false)
+    }
+
+    const handleConnectError = (error: Error) => {
+      setIsChatConnected(false)
+      setSendError(error.message || "Unable to connect to support chat.")
+      console.error("Support socket connection failed", error)
+    }
+
+    const handleTicketClosed = ({ ticketId }: { ticketId?: string }) => {
+      if (!ticketId) return
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket._id === ticketId ? { ...ticket, status: "closed" } : ticket
+        )
+      )
+
+      setActiveTicket((prev) =>
+        prev?._id === ticketId ? { ...prev, status: "closed" } : prev
+      )
+    }
+
+    socket.on("connect", handleConnect)
+    socket.on("disconnect", handleDisconnect)
+    socket.on("connect_error", handleConnectError)
+    socket.on("receive_message", handleIncomingMessage)
+    socket.on("ticket_closed", handleTicketClosed)
 
     return () => {
+      socket.off("connect", handleConnect)
+      socket.off("disconnect", handleDisconnect)
+      socket.off("connect_error", handleConnectError)
+      socket.off("receive_message", handleIncomingMessage)
+      socket.off("ticket_closed", handleTicketClosed)
       socket.disconnect()
     }
   }, [])
@@ -346,7 +459,7 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
             {/* Chat Composer */}
             {activeTicket.status === "open" ? (
-              <div className="p-4 sm:p-5 bg-white border-t border-[#ece4d6]">
+              <div className="border-t border-[#ece4d6] bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
                 <form onSubmit={sendMessage} className="relative flex items-center">
                   <input
                     type="text"
@@ -357,12 +470,14 @@ const UserSupport = ({ currentUser }: { currentUser: AuthUser | null }) => {
                   />
                   <Button 
                     type="submit" 
-                    disabled={!chatMessage.trim()}
+                    disabled={!chatMessage.trim() || isSendingMessage || !isChatConnected}
                     className="absolute right-2 h-10 w-10 p-0 rounded-full bg-[#10382e] hover:bg-[#0c2a23] text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                   >
                     <Send className="h-4 w-4 ml-0.5" />
                   </Button>
                 </form>
+                {!isChatConnected ? <p className="mt-2 text-center text-sm font-medium text-[#8c7d60]">Reconnecting to chat...</p> : null}
+                {sendError ? <p className="mt-2 text-center text-sm font-medium text-red-600">{sendError}</p> : null}
                 <p className="text-center mt-2 text-[11px] text-[#a0937a]">Press enter to send securely.</p>
               </div>
             ) : (

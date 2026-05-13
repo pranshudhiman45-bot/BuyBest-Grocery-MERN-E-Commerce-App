@@ -379,7 +379,7 @@ const App = () => {
             )
           ) : null}
           {activeView === "login" ? (
-            <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center px-4 py-10">
+            <div className="min-h-[calc(100svh-8rem)] flex items-center justify-center px-4 py-10">
               <div className="w-full max-w-md">
                 <LoginForm
                   onAuthenticated={handleAuthenticated}

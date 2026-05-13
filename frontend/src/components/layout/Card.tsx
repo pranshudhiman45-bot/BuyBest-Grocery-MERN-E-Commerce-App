@@ -15,6 +15,8 @@ export function CategoryCard({ title, image }: CategoryCardProps) {
           <img
             src={image}
             alt={title}
+            loading="lazy"
+            decoding="async"
             className="w-10 h-10 object-contain"
           />
         </div>

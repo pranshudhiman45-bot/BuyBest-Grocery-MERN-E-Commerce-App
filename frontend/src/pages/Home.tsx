@@ -155,6 +155,8 @@ const ImagePlaceholder = ({
       <img
         src={src}
         alt={label}
+        loading="lazy"
+        decoding="async"
         className="block h-full w-full object-contain object-center"
       />
     ) : (

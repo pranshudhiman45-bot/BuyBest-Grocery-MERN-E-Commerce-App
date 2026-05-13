@@ -15,6 +15,41 @@ const normalizeAddress = (address, selectedAddressId) => ({
   isDefault: selectedAddressId === address._id.toString()
 })
 
+const pickFirst = (...values) =>
+  values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() || ''
+
+const buildSuggestedAddress = (data) => {
+  const address = data?.address || {}
+  const city = pickFirst(
+    address.city,
+    address.town,
+    address.village,
+    address.municipality,
+    address.county
+  )
+  const state = pickFirst(address.state, address.region, address.state_district)
+  const street = pickFirst(
+    [address.road, address.neighbourhood, address.suburb].filter(Boolean).join(', '),
+    address.quarter,
+    address.hamlet
+  )
+  const addressLine = pickFirst(
+    [address.house_number, address.road, address.neighbourhood, address.suburb]
+      .filter(Boolean)
+      .join(', '),
+    data?.display_name
+  )
+
+  return {
+    addressLine,
+    street,
+    city,
+    state,
+    postalCode: pickFirst(address.postcode),
+    country: pickFirst(address.country) || 'India'
+  }
+}
+
 const syncDefaultAddress = async (userId, selectedAddressId) => {
   await addressModel.updateMany({ user: userId }, { status: false })
   await addressModel.findByIdAndUpdate(selectedAddressId, { status: true })
@@ -66,6 +101,47 @@ const validateAddressPayload = (payload) => {
 const getAddresses = asyncHandler(async (req, res) => {
   const response = await getAddressResponse(req.user)
   res.status(200).json(response)
+})
+
+const suggestAddressFromLocation = asyncHandler(async (req, res) => {
+  const latitude = Number(req.body.latitude)
+  const longitude = Number(req.body.longitude)
+
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    throw new AppError('Please provide valid location coordinates', 400)
+  }
+
+  const url = new URL('https://nominatim.openstreetmap.org/reverse')
+  url.searchParams.set('format', 'jsonv2')
+  url.searchParams.set('lat', String(latitude))
+  url.searchParams.set('lon', String(longitude))
+  url.searchParams.set('addressdetails', '1')
+
+  const response = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'BuyBest/1.0 support@buybest.local'
+    }
+  })
+
+  if (!response.ok) {
+    throw new AppError('Unable to suggest an address from this location', 502)
+  }
+
+  const data = await response.json()
+  const suggestion = buildSuggestedAddress(data)
+
+  res.status(200).json({
+    message: 'Address suggestion created from your current location',
+    address: suggestion
+  })
 })
 
 const createAddress = asyncHandler(async (req, res) => {
@@ -175,6 +251,7 @@ const deleteAddress = asyncHandler(async (req, res) => {
 
 module.exports = {
   getAddresses,
+  suggestAddressFromLocation,
   createAddress,
   selectAddress,
   updateAddress,

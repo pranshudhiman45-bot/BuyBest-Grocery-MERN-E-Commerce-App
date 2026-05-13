@@ -31,7 +31,10 @@ import type { Product } from "@/lib/storefront"
 const DELIVERY_FEE = 40
 const FREE_DELIVERY_THRESHOLD = 300
 const DEFAULT_TAX_PERCENTAGE = 5
+const STORE_CACHE_TTL_MS = 60 * 1000
 let guestCartEntries: GuestCartEntry[] = []
+let cachedProducts: { value: Product[]; expiresAt: number } | null = null
+let cachedSettings: { value: { taxPercentage: number }; expiresAt: number } | null = null
 
 type GuestCartEntry = {
   productId: string
@@ -94,6 +97,34 @@ const writeGuestCartEntries = (entries: GuestCartEntry[]) => {
   )
 }
 
+const fetchCachedProducts = async () => {
+  if (cachedProducts && cachedProducts.expiresAt > Date.now()) {
+    return cachedProducts.value
+  }
+
+  const products = await fetchProducts()
+  cachedProducts = {
+    value: products,
+    expiresAt: Date.now() + STORE_CACHE_TTL_MS,
+  }
+  return products
+}
+
+const fetchCachedAppSettings = async () => {
+  if (cachedSettings && cachedSettings.expiresAt > Date.now()) {
+    return cachedSettings.value
+  }
+
+  const settings = await fetchAppSettings().catch(() => ({
+    taxPercentage: DEFAULT_TAX_PERCENTAGE,
+  }))
+  cachedSettings = {
+    value: settings,
+    expiresAt: Date.now() + STORE_CACHE_TTL_MS,
+  }
+  return settings
+}
+
 const buildGuestSummary = (items: CartItem[], taxPercentage: number): CartSummary => {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0)
   const deliveryFee =
@@ -120,7 +151,7 @@ const buildGuestCartState = async (entries: GuestCartEntry[], taxPercentage: num
     }
   }
 
-  const products = await fetchProducts()
+  const products = await fetchCachedProducts()
   const productMap = new Map(products.map((product) => [product.id, product]))
 
   const items = entries.flatMap((entry) => {
@@ -230,6 +261,21 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       return
     }
 
+    const cartItem = cartItems.find((item) => item.productId === productId)
+
+    if (cartItem) {
+      const availableStock = Math.max(0, cartItem.stock ?? 0)
+      const maxPerOrder = normalizeMaxPerOrder(cartItem.maxPerOrder)
+      const effectiveLimit =
+        maxPerOrder === null ? availableStock : Math.min(availableStock, maxPerOrder)
+
+      if (effectiveLimit <= 0 || requestedQuantity > effectiveLimit) {
+        throw new Error(getProductLimitErrorMessage(cartItem.name, maxPerOrder))
+      }
+
+      return
+    }
+
     const product = await fetchProductById(productId)
     const availableStock = Math.max(0, product.stock ?? 0)
     const maxPerOrder = normalizeMaxPerOrder(product.maxPerOrder)
@@ -239,16 +285,18 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (effectiveLimit <= 0 || requestedQuantity > effectiveLimit) {
       throw new Error(getProductLimitErrorMessage(product.name, maxPerOrder))
     }
-  }, [])
+  }, [cartItems])
 
   const refreshCart = useCallback(async () => {
     setIsCartLoading(true)
     try {
-      const settings = await fetchAppSettings().catch(() => ({ taxPercentage: DEFAULT_TAX_PERCENTAGE }))
+      const [settings, userCartData] = await Promise.all([
+        fetchCachedAppSettings(),
+        currentUser ? fetchCart() : Promise.resolve(null),
+      ])
       setTaxPercentage(settings.taxPercentage)
-      const data = currentUser
-        ? await fetchCart()
-        : await buildGuestCartState(readGuestCartEntries(), settings.taxPercentage)
+      const data =
+        userCartData || (await buildGuestCartState(readGuestCartEntries(), settings.taxPercentage))
       syncCartState(data)
     } finally {
       setIsCartLoading(false)

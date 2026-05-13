@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { MapPin, Pencil, Plus, Trash2, TriangleAlert, X } from "lucide-react"
+import { LocateFixed, MapPin, Pencil, Plus, Trash2, TriangleAlert, X } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -11,9 +11,11 @@ import {
   deleteAddress,
   fetchAddresses,
   selectAddress,
+  suggestAddressFromLocation,
   updateAddress,
   type Address,
   type CreateAddressPayload,
+  type SuggestedAddress,
 } from "@/lib/store-api"
 
 type AddressSectionProps = {
@@ -47,6 +49,7 @@ export function AddressSection({
   const [isLoading, setIsLoading] = useState(isLoggedIn)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSelecting, setIsSelecting] = useState<string | null>(null)
+  const [isSuggestingAddress, setIsSuggestingAddress] = useState(false)
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
   const [deletingAddressId, setDeletingAddressId] = useState<string | null>(null)
 
@@ -100,6 +103,59 @@ export function AddressSection({
   const resetForm = () => {
     setFormState(initialFormState)
     setEditingAddressId(null)
+  }
+
+  const applyAddressSuggestion = (suggestion: SuggestedAddress) => {
+    setFormState((current) => ({
+      ...current,
+      addressLine: suggestion.addressLine || current.addressLine,
+      street: suggestion.street || current.street,
+      city: suggestion.city || current.city,
+      state: suggestion.state || current.state,
+      postalCode: suggestion.postalCode || current.postalCode,
+      country: suggestion.country || current.country || "India",
+    }))
+  }
+
+  const handleSuggestAddressFromLocation = async () => {
+    if (!navigator.geolocation) {
+      setFeedback("Location access is not supported by this browser. Please enter your address manually.")
+      return
+    }
+
+    setIsSuggestingAddress(true)
+    setFeedback("")
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const response = await suggestAddressFromLocation(
+            position.coords.latitude,
+            position.coords.longitude
+          )
+          applyAddressSuggestion(response.address)
+          setFeedback("We filled an address suggestion from your location. Please review and edit it before saving.")
+        } catch (error) {
+          setFeedback(error instanceof Error ? error.message : "Unable to suggest an address from your location.")
+        } finally {
+          setIsSuggestingAddress(false)
+        }
+      },
+      (error) => {
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission was denied. You can still enter your address manually."
+            : "Unable to detect your location. Please enter your address manually."
+
+        setFeedback(message)
+        setIsSuggestingAddress(false)
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60 * 1000,
+        timeout: 12000,
+      }
+    )
   }
 
   const handleCreateOrUpdateAddress = async () => {
@@ -330,6 +386,27 @@ export function AddressSection({
             </button>
           </div>
         ) : null}
+
+        <div className="mt-4 rounded-[16px] border border-[#dfeadd] bg-[#f7fcf8] px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#1B4D3E]">Use current location as a suggestion</p>
+              <p className="mt-1 text-sm leading-5 text-[#6f6148]">
+                We will prefill the address fields only. You can edit everything before saving.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleSuggestAddressFromLocation()}
+              disabled={isSuggestingAddress}
+              className="shrink-0 rounded-2xl border-[#cfe3d5] bg-white text-[#1B4D3E] hover:bg-[#edf8f1]"
+            >
+              <LocateFixed className="h-4 w-4" />
+              {isSuggestingAddress ? "Finding..." : "Use location"}
+            </Button>
+          </div>
+        </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">

@@ -7,6 +7,7 @@ const router = express.Router()
 router.use(authMiddleware)
 
 router.get('/', addressController.getAddresses)
+router.post('/suggest-from-location', addressController.suggestAddressFromLocation)
 router.post('/', addressController.createAddress)
 router.put('/:addressId', addressController.updateAddress)
 router.delete('/:addressId', addressController.deleteAddress)

@@ -88,6 +88,8 @@ export type CreateAddressPayload = {
   setAsDefault?: boolean
 }
 
+export type SuggestedAddress = Omit<CreateAddressPayload, "mobile" | "setAsDefault">
+
 export type ProductFormData = {
   name: string
   slug?: string
@@ -464,6 +466,18 @@ export async function fetchAddresses() {
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to load addresses."))
+  }
+}
+
+export async function suggestAddressFromLocation(latitude: number, longitude: number) {
+  try {
+    const response = await storeApi.post<{ message: string; address: SuggestedAddress }>(
+      "/api/addresses/suggest-from-location",
+      { latitude, longitude }
+    )
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to suggest an address from your location."))
   }
 }
 

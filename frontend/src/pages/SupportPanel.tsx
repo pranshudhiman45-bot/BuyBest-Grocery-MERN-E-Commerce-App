@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from "react"
-import axios from "axios"
 import { io, Socket } from "socket.io-client"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { AuthUser } from "@/lib/auth"
 import { API_BASE_URL } from "@/lib/api-config"
+import { supportApi } from "@/lib/support-api"
 
 type Message = {
   _id?: string
@@ -19,6 +19,13 @@ type Message = {
 type IncomingMessage = Message & {
   ticketId?: string
 }
+
+type SendMessageAck = {
+  ok?: boolean
+  error?: string
+}
+
+type JoinTicketAck = SendMessageAck
 
 type OrderHistoryItem = {
   _id: string
@@ -73,15 +80,17 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null)
   const [chatMessage, setChatMessage] = useState("")
+  const [sendError, setSendError] = useState("")
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [isChatConnected, setIsChatConnected] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const socketRef = useRef<Socket | null>(null)
   const chatBottomRef = useRef<HTMLDivElement | null>(null)
+  const activeTicketIdRef = useRef<string | null>(null)
 
   const fetchAllTickets = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/support/all`, {
-        withCredentials: true,
-      })
+      const res = await supportApi.get("/api/support/all")
       setTickets(res.data.tickets)
     } catch (err) {
       console.error("Failed to fetch all tickets", err)
@@ -90,8 +99,13 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
 
   const joinTicketChat = (ticket: Ticket) => {
     setActiveTicket(ticket)
-    if (socketRef.current) {
-      socketRef.current.emit("join_ticket", ticket._id)
+    setSendError("")
+    if (socketRef.current?.connected) {
+      socketRef.current.timeout(10000).emit("join_ticket", ticket._id, (error: Error | null, response?: JoinTicketAck) => {
+        if (error || response?.ok === false) {
+          setSendError(response?.error || "Unable to join this ticket chat.")
+        }
+      })
     }
   }
 
@@ -99,20 +113,39 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
     e.preventDefault()
     if (!chatMessage.trim() || !activeTicket || !currentUser) return
 
-    if (socketRef.current) {
-      socketRef.current.emit("send_message", {
-        ticketId: activeTicket._id,
-        senderId: currentUser.id,
-        text: chatMessage,
-      })
-      setChatMessage("")
+    const socket = socketRef.current
+    if (!socket?.connected) {
+      setSendError("Chat is still connecting. Please try again in a moment.")
+      return
     }
+
+    const messageText = chatMessage.trim()
+    setSendError("")
+    setIsSendingMessage(true)
+
+    socket.timeout(10000).emit(
+      "send_message",
+      {
+        ticketId: activeTicket._id,
+        text: messageText,
+      },
+      (error: Error | null, response?: SendMessageAck) => {
+        setIsSendingMessage(false)
+
+        if (error || !response?.ok) {
+          setSendError(response?.error || "Message timed out. Please try again.")
+          return
+        }
+
+        setChatMessage("")
+      }
+    )
   }
 
   const closeTicket = async () => {
     if (!activeTicket) return
     try {
-      await axios.patch(`${API_BASE_URL}/api/support/${activeTicket._id}/close`, {}, { withCredentials: true })
+      await supportApi.patch(`/api/support/${activeTicket._id}/close`)
       setActiveTicket({ ...activeTicket, status: 'closed' })
       fetchAllTickets()
     } catch(err) {
@@ -121,12 +154,43 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
   }
 
   useEffect(() => {
-    fetchAllTickets()
+    const timer = window.setTimeout(() => {
+      void fetchAllTickets()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    activeTicketIdRef.current = activeTicket?._id || null
+  }, [activeTicket?._id])
 
   useEffect(() => {
     const socket = io(API_BASE_URL, { withCredentials: true })
     socketRef.current = socket
+
+    const handleConnect = () => {
+      setIsChatConnected(true)
+      setSendError("")
+      if (activeTicketIdRef.current) {
+        socket.timeout(10000).emit("join_ticket", activeTicketIdRef.current, (error: Error | null, response?: JoinTicketAck) => {
+          if (error || response?.ok === false) {
+            setSendError(response?.error || "Unable to rejoin this ticket chat.")
+          }
+        })
+      }
+    }
+
+    const handleDisconnect = () => {
+      setIsChatConnected(false)
+      setIsSendingMessage(false)
+    }
+
+    const handleConnectError = (error: Error) => {
+      setIsChatConnected(false)
+      setSendError(error.message || "Unable to connect to support chat.")
+      console.error("Support socket connection failed", error)
+    }
 
     const handleIncomingMessage = (message: IncomingMessage) => {
       setTickets((prev) =>
@@ -180,20 +244,44 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
       })
     }
 
-    socket.on("receive_message", handleIncomingMessage)
-    socket.on("support_receive_message", handleIncomingMessage)
-
-    socket.on("new_ticket", (ticket: Ticket) => {
+    const handleNewTicket = (ticket: Ticket) => {
       setTickets((prev) => {
         // Prevent duplicate tickets
         if (prev.find((t) => t._id === ticket._id)) return prev
         return [ticket, ...prev]
       })
-    })
+    }
+
+    const handleTicketClosed = ({ ticketId }: { ticketId?: string }) => {
+      if (!ticketId) return
+
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket._id === ticketId ? { ...ticket, status: "closed" } : ticket
+        )
+      )
+
+      setActiveTicket((prev) =>
+        prev?._id === ticketId ? { ...prev, status: "closed" } : prev
+      )
+    }
+
+    socket.on("connect", handleConnect)
+    socket.on("disconnect", handleDisconnect)
+    socket.on("connect_error", handleConnectError)
+    socket.on("receive_message", handleIncomingMessage)
+    socket.on("support_receive_message", handleIncomingMessage)
+    socket.on("new_ticket", handleNewTicket)
+    socket.on("ticket_closed", handleTicketClosed)
 
     return () => {
+      socket.off("connect", handleConnect)
+      socket.off("disconnect", handleDisconnect)
+      socket.off("connect_error", handleConnectError)
       socket.off("receive_message", handleIncomingMessage)
       socket.off("support_receive_message", handleIncomingMessage)
+      socket.off("new_ticket", handleNewTicket)
+      socket.off("ticket_closed", handleTicketClosed)
       socket.disconnect()
     }
   }, [])
@@ -214,7 +302,7 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
   })
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-[#fcf8ef] md:flex-row">
+    <div className="flex min-h-[calc(100svh-4rem)] flex-col bg-[#fcf8ef] md:flex-row">
       {/* Sidebar for Ticket List */}
       <div
         className={`border-[#ece4d6] bg-white md:w-[340px] md:shrink-0 md:border-r lg:w-[32%] ${
@@ -235,7 +323,7 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
           />
         </div>
 
-        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-2 space-y-2 md:max-h-[calc(100vh-8rem)]">
+        <div className="max-h-[calc(100svh-9rem)] overflow-y-auto p-2 space-y-2 md:max-h-[calc(100svh-8rem)]">
           {filteredTickets.length === 0 ? (
             <p className="p-4 text-center text-[#8f8168]">No tickets match search.</p>
           ) : (
@@ -388,7 +476,7 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
             </div>
 
             {activeTicket.status === "open" && (
-              <div className="p-4 bg-white border-t border-[#ece4d6]">
+              <div className="border-t border-[#ece4d6] bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <form onSubmit={sendMessage} className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
@@ -397,10 +485,16 @@ const SupportPanel = ({ currentUser }: { currentUser: AuthUser | null }) => {
                     className="flex-1 h-12 px-4 rounded-xl border border-[#e6dcc9] focus:ring-[#c8aa45] focus:border-[#c8aa45] outline-none shadow-sm"
                     placeholder="Type your response to the customer..."
                   />
-                  <Button type="submit" className="h-12 w-full rounded-xl bg-[#1B4D3E] hover:bg-[#163d32] text-white font-medium sm:w-24">
-                    Reply
+                  <Button
+                    type="submit"
+                    disabled={!chatMessage.trim() || isSendingMessage || !isChatConnected}
+                    className="h-12 w-full rounded-xl bg-[#1B4D3E] hover:bg-[#163d32] text-white font-medium disabled:opacity-60 sm:w-24"
+                  >
+                    {isSendingMessage ? "Sending" : "Reply"}
                   </Button>
                 </form>
+                {!isChatConnected ? <p className="mt-2 text-sm font-medium text-[#8f8168]">Reconnecting to chat...</p> : null}
+                {sendError ? <p className="mt-2 text-sm font-medium text-red-600">{sendError}</p> : null}
               </div>
             )}
           </>

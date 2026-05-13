@@ -213,6 +213,52 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
    dispatch(appShellActions.openProduct(product.id))
   }
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationAlert("Geolocation is not supported by your browser.")
+      return
+    }
+
+    setIsLocating(true)
+    setLocationAlert("")
+    setLocationName("Detecting...")
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          )
+          const data = await response.json()
+
+          const city =
+            data.address.city ||
+            data.address.town ||
+            data.address.village ||
+            "Your Location"
+
+          setLocationName(city)
+        } catch {
+          setLocationName("Location found")
+        } finally {
+          setIsLocating(false)
+        }
+      },
+      () => {
+        setLocationAlert("Permission denied. Please allow location access.")
+        setLocationName("Select Location")
+        setIsLocating(false)
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60 * 1000,
+        timeout: 12000,
+      }
+    )
+  }
+
   const handleLogoutConfirm = async () => {
     if (isLoggingOut) {
       return
@@ -337,7 +383,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                           itemIndex === activeIndex ? "bg-[#faf4e8]" : "hover:bg-[#fcf8ef]"
                         }`}
                         onMouseEnter={() => setActiveIndex(itemIndex)}
-                        onMouseDown={(event) => {
+                        onPointerDown={(event) => {
                           event.preventDefault()
                           handleSelectProduct(item)
                         }}
@@ -390,46 +436,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
               variant="ghost"
               className="hidden h-10 items-center gap-2 rounded-full border border-[#ece4d6] bg-white px-3 text-[#7d6d52] hover:bg-[#faf4e8] md:flex"
               title="Delivery location"
-              onClick={() => {
-                if (!navigator.geolocation) {
-                  setLocationAlert("Geolocation is not supported by your browser.")
-                  return
-                }
-
-                setIsLocating(true)
-                setLocationAlert("")
-                setLocationName("Detecting...")
-
-                navigator.geolocation.getCurrentPosition(
-                  async (position) => {
-                    const { latitude, longitude } = position.coords
-
-                    try {
-                      const response = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-                      )
-                      const data = await response.json()
-
-                      const city =
-                        data.address.city ||
-                        data.address.town ||
-                        data.address.village ||
-                        "Your Location"
-
-                      setLocationName(city)
-                    } catch {
-                      setLocationName("Location found")
-                    } finally {
-                      setIsLocating(false)
-                    }
-                  },
-                  () => {
-                    setLocationAlert("Permission denied. Please allow location access.")
-                    setLocationName("Select Location")
-                    setIsLocating(false)
-                  }
-                )
-              }}
+              onClick={handleDetectLocation}
             >
               <MapPin className="h-4 w-4 text-[#a78410]" />
               <span className="max-w-28 truncate text-sm font-medium">
@@ -523,6 +530,15 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
 
         <div className="border-t border-[#efe5d6] px-3 pb-3 pt-2 lg:hidden">
           <div className="mx-auto flex max-w-[1380px] flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleDetectLocation}
+              disabled={isLocating}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#ece4d6] bg-white px-3 py-2 text-xs font-semibold text-[#7d6d52] transition hover:bg-[#faf4e8] disabled:opacity-70"
+            >
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-[#a78410]" />
+              <span className="truncate">{isLocating ? "Detecting..." : locationName}</span>
+            </button>
             {user?.role !== "support" ? (
               <>
                 <button
@@ -631,7 +647,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                           itemIndex === activeIndex ? "bg-[#faf4e8]" : "hover:bg-[#fcf8ef]"
                         }`}
                         onMouseEnter={() => setActiveIndex(itemIndex)}
-                        onMouseDown={(event) => {
+                        onPointerDown={(event) => {
                           event.preventDefault()
                           handleSelectProduct(item)
                         }}

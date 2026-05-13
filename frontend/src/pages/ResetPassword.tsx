@@ -81,8 +81,8 @@ export default function ResetPasswordPage({
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee] px-4 py-10">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center">
+    <div className="min-h-svh bg-[#f7f4ee] px-4 py-10">
+      <div className="mx-auto flex min-h-[calc(100svh-5rem)] w-full max-w-md items-center">
         <Card className="relative w-full overflow-hidden rounded-[30px] border border-[#ece4d6] bg-[linear-gradient(135deg,#fffdf8_0%,#fff8ea_40%,#f4fbf6_100%)] py-0 shadow-[0_24px_60px_rgba(78,62,31,0.10)]">
           {onBackToLogin ? (
             <button
