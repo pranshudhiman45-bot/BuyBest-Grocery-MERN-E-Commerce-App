@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken')
 const userModel = require('../models/user.model.js')
+const orderModel = require('../models/order.model.js')
 const emailService = require('./email.service.js')
 const env = require('../config/env.js')
 const { AUTH_PROVIDERS } = require('../constants/auth.constants.js')
@@ -116,6 +117,52 @@ const getSocketToken = async user => {
     statusCode: 200,
     body: {
       token: createAccessToken(user._id)
+    }
+  }
+}
+
+const formatOrderHistoryItem = order => ({
+  id: order._id.toString(),
+  orderId: order.orderId,
+  productName: order.productDetails?.name || 'Product',
+  productImage: Array.isArray(order.productDetails?.image)
+    ? order.productDetails.image[0] || null
+    : null,
+  quantity: order.quantity,
+  total: order.total,
+  paymentMethod: order.paymentMethod,
+  paymentStatus: order.paymentStatus,
+  couponCode: order.couponCode,
+  createdAt: order.createdAt,
+  deliveryAddress:
+    order.deliveryAddress && typeof order.deliveryAddress === 'object'
+      ? {
+          addressLine: order.deliveryAddress.addresLine,
+          city: order.deliveryAddress.city,
+          state: order.deliveryAddress.state,
+          postalCode: order.deliveryAddress.postalCode
+        }
+      : null
+})
+
+const getOrderHistory = async user => {
+  if (!user?._id) {
+    throw new AppError('Authenticated user not found', 401)
+  }
+
+  const orders = await orderModel
+    .find({ userId: user._id })
+    .populate({
+      path: 'deliveryAddress',
+      select: 'addresLine city state postalCode'
+    })
+    .sort({ createdAt: -1 })
+    .limit(50)
+
+  return {
+    statusCode: 200,
+    body: {
+      orders: orders.map(formatOrderHistoryItem)
     }
   }
 }
@@ -676,6 +723,7 @@ module.exports = {
   registerUser,
   getCurrentUser,
   getSocketToken,
+  getOrderHistory,
   verifyRegistrationOtp,
   resendRegistrationOtp,
   forgotPassword,

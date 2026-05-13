@@ -1,7 +1,8 @@
 import * as React from "react"
-import { Camera, CircleAlert, MailCheck, PartyPopper, UserRound } from "lucide-react"
+import { Camera, CircleAlert, MailCheck, PackageCheck, PartyPopper, ReceiptText, UserRound } from "lucide-react"
 
 import {
+  fetchOrderHistory,
   fetchCurrentUser,
   storeAuthUser,
   updateUserProfile,
@@ -9,6 +10,7 @@ import {
   verifyNewEmailOtp,
   verifyNewPasswordOtp,
   type AuthUser,
+  type OrderHistoryItem,
 } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -39,6 +41,26 @@ const getInitials = (name: string) =>
     .map((part) => part[0]?.toUpperCase() || "")
     .join("")
 
+const formatOrderDate = (createdAt?: string) => {
+  if (!createdAt) return "Recent order"
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(createdAt))
+}
+
+const formatOrderPrice = (value: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(value || 0)
+
+const formatOrderStatus = (status?: string | null) =>
+  status ? status.replace(/_/g, " ") : "pending"
+
 export function ProfileEditorSheet({
   open,
   onOpenChange,
@@ -57,6 +79,9 @@ export function ProfileEditorSheet({
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false)
   const [isVerifyingEmail, setIsVerifyingEmail] = React.useState(false)
   const [isVerifyingPassword, setIsVerifyingPassword] = React.useState(false)
+  const [orders, setOrders] = React.useState<OrderHistoryItem[]>([])
+  const [orderHistoryError, setOrderHistoryError] = React.useState("")
+  const [isLoadingOrders, setIsLoadingOrders] = React.useState(false)
   const [isAwaitingEmailVerification, setIsAwaitingEmailVerification] = React.useState(false)
   const [isAwaitingPasswordVerification, setIsAwaitingPasswordVerification] = React.useState(false)
   const [popupState, setPopupState] = React.useState<{
@@ -72,6 +97,41 @@ export function ProfileEditorSheet({
     onUserUpdate(response.user)
     return response.user
   }, [onUserUpdate])
+
+  React.useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    let isMounted = true
+    setIsLoadingOrders(true)
+    setOrderHistoryError("")
+
+    void fetchOrderHistory()
+      .then((response) => {
+        if (isMounted) {
+          setOrders(response.orders)
+        }
+      })
+      .catch((historyError) => {
+        if (isMounted) {
+          setOrderHistoryError(
+            historyError instanceof Error
+              ? historyError.message
+              : "Unable to load order history."
+          )
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingOrders(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [open])
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -366,6 +426,88 @@ export function ProfileEditorSheet({
 
                 </FieldGroup>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[26px] border border-[#ece4d6] bg-white/90 py-0 shadow-[0_18px_44px_rgba(78,62,31,0.08)]">
+            <CardHeader className="rounded-t-[26px] border-b border-[#efe4d1] bg-[#fffaf3] px-6 py-5">
+              <CardTitle className="flex items-center gap-2 text-[#2c2417]">
+                <ReceiptText className="h-5 w-5 text-[#624c11]" />
+                Order history
+              </CardTitle>
+              <CardDescription className="text-[#7d6d52]">
+                Review your recent purchases and payment status.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="py-5">
+              {isLoadingOrders ? (
+                <div className="rounded-2xl border border-[#efe4d1] bg-[#fbf8f2] px-4 py-5 text-sm font-medium text-[#7d6d52]">
+                  Loading your orders...
+                </div>
+              ) : orderHistoryError ? (
+                <Alert variant="destructive" onDismiss={() => setOrderHistoryError("")}>
+                  <AlertDescription>{orderHistoryError}</AlertDescription>
+                </Alert>
+              ) : orders.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#e6dcc9] bg-[#fbf8f2] px-4 py-6 text-center">
+                  <PackageCheck className="mx-auto h-8 w-8 text-[#b9a987]" />
+                  <p className="mt-3 text-sm font-semibold text-[#2c2417]">No orders yet</p>
+                  <p className="mt-1 text-sm text-[#7d6d52]">
+                    Your completed checkout history will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-110 space-y-3 overflow-y-auto pr-1">
+                  {orders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="rounded-[20px] border border-[#ece4d6] bg-[#fffdf8] p-3 shadow-sm"
+                    >
+                      <div className="flex gap-3">
+                        <div className="flex h-15 w-15 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#efe4d1] bg-white">
+                          {order.productImage ? (
+                            <img
+                              src={order.productImage}
+                              alt={order.productName}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <PackageCheck className="h-6 w-6 text-[#b9a987]" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-[#2c2417]">
+                                {order.productName}
+                              </p>
+                              <p className="mt-1 text-xs font-medium text-[#8b7a5d]">
+                                #{order.orderId} • {formatOrderDate(order.createdAt)}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-[#f4fbf6] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1B4D3E]">
+                              {formatOrderStatus(order.paymentStatus)}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#7d6d52]">
+                            <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-[#efe4d1]">
+                              Qty {order.quantity}
+                            </span>
+                            <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-[#624c11] ring-1 ring-[#efe4d1]">
+                              {formatOrderPrice(order.total)}
+                            </span>
+                            {order.paymentMethod ? (
+                              <span className="rounded-full bg-white px-2.5 py-1 capitalize ring-1 ring-[#efe4d1]">
+                                {order.paymentMethod.replace(/_/g, " ")}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

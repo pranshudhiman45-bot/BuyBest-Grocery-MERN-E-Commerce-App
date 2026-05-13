@@ -51,6 +51,29 @@ export type CurrentUserResponse = {
   accessToken?: string
 }
 
+export type OrderHistoryItem = {
+  id: string
+  orderId: string
+  productName: string
+  productImage?: string | null
+  quantity: number
+  total: number
+  paymentMethod?: string | null
+  paymentStatus?: string | null
+  couponCode?: string | null
+  createdAt?: string
+  deliveryAddress?: {
+    addressLine?: string
+    city?: string
+    state?: string
+    postalCode?: string
+  } | null
+}
+
+export type OrderHistoryResponse = {
+  orders: OrderHistoryItem[]
+}
+
 type ApiErrorResponse = {
   message?: string
 }
@@ -279,6 +302,16 @@ export async function fetchCurrentUser() {
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to load current user."))
+  }
+}
+
+export async function fetchOrderHistory() {
+  try {
+    const response = await authApi.get<OrderHistoryResponse>("/api/auth/order-history")
+
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load order history."))
   }
 }
 

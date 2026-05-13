@@ -134,6 +134,11 @@ const getSocketToken = asyncHandler(async (req, res) => {
   res.status(response.statusCode).json(response.body)
 })
 
+const getOrderHistory = asyncHandler(async (req, res) => {
+  const response = await authService.getOrderHistory(req.user)
+  res.status(response.statusCode).json(response.body)
+})
+
 const verifyRegistrationOtp = asyncHandler(async (req, res) => {
   const response = await authService.verifyRegistrationOtp(req.body, res)
   res.status(response.statusCode).json(response.body)
@@ -213,6 +218,7 @@ module.exports = {
   registerUser,
   getCurrentUser,
   getSocketToken,
+  getOrderHistory,
   verifyRegistrationOtp,
   resendRegistrationOtp,
   forgotPassword,
