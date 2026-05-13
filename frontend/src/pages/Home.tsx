@@ -228,7 +228,7 @@ const ProductCard = React.memo(function ProductCard({
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -6, scale: 1.01 }}
-      className="mx-auto w-full max-w-55 min-h-[290px] sm:min-h-[325px] overflow-hidden rounded-[14px] border border-[#e8e4da] bg-white shadow-[0_3px_10px_rgba(38,33,24,0.05)] transition hover:shadow-[0_8px_18px_rgba(38,33,24,0.08)] sm:rounded-[18px]"
+      className="mx-auto w-full max-w-55 min-h-[255px] sm:min-h-[285px] overflow-hidden rounded-[14px] border border-[#e8e4da] bg-white shadow-[0_3px_10px_rgba(38,33,24,0.05)] transition hover:shadow-[0_8px_18px_rgba(38,33,24,0.08)] sm:rounded-[18px]"
     >
       <div
         role="button"
@@ -257,19 +257,19 @@ const ProductCard = React.memo(function ProductCard({
           ) : null}
 
           <motion.div
-            className="flex h-24 w-full max-w-44 items-center justify-center sm:h-30"
+            className="flex h-20 w-full max-w-44 items-center justify-center sm:h-24"
             whileHover={{ scale: 1.05, rotate: -1.5 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
           >
             <ImagePlaceholder
               label={product.imageLabel}
               src={product.images?.[0]}
-              className="mx-auto h-19 w-19 bg-white sm:h-24 sm:w-24"
+              className="mx-auto h-16 w-16 bg-white sm:h-19 sm:w-19"
             />
           </motion.div>
         </div>
 
-        <div className="flex grow flex-col px-3 pb-3 pt-0.5 sm:px-3.5 sm:pb-4">
+        <div className="flex grow flex-col px-2.5 pb-2 pt-0 sm:px-3 sm:pb-2.5">
           <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#9a8d74] sm:text-[11px]">
             {product.brand || product.categoryLabel}
           </p>
