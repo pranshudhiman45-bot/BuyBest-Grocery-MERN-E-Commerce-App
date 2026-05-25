@@ -235,5 +235,5 @@ Current default development credentials:
 - The frontend now has a shared env template at [frontend/.env.example](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/frontend/.env.example); keep real environment-specific values in `frontend/.env`.
 - `RESET_PASSWORD_URL` should point to the frontend reset-password page, usually `http://localhost:5173/reset-password` in local development.
 - Current production pair:
-  Frontend `https://buy-best-grocery-mern-e-commerce-ap.vercel.app`
-  Backend `https://buybest-grocery-mern-e-commerce-app.onrender.com`
+  Frontend `https://buybestgrocery.duckdns.org`
+  Backend `https://buybestgrocery.duckdns.org`
