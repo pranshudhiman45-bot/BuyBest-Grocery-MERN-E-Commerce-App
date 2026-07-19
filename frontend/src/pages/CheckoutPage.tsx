@@ -24,6 +24,7 @@ import {
   isCouponEligible,
   type CouponDefinition,
 } from "@/lib/offers"
+import { getApiUrl } from "@/lib/api-config"
 import {
   createStripeCheckoutSession,
   fetchCoupons,
@@ -119,7 +120,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
       if (sessionId) {
         import("axios").then((axios) => {
           axios.default.post(
-            `${import.meta.env.VITE_API_BASE_URL || "http://localhost:4000"}/api/payment/cancel-session/${sessionId}`,
+            getApiUrl(`/api/payment/cancel-session/${sessionId}`),
             {},
             { withCredentials: true }
           ).catch(console.error)

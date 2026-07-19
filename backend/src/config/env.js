@@ -40,9 +40,6 @@ if (nodeEnv === 'production') {
     throw new Error('Production requires FRONTEND_URL to be configured.')
   }
 
-  if (!process.env.RESET_PASSWORD_URL) {
-    throw new Error('Production requires RESET_PASSWORD_URL to be configured.')
-  }
 }
 
 const frontendUrl =
