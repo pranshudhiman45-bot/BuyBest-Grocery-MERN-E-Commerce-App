@@ -4,6 +4,7 @@ import { API_BASE_URL } from "@/lib/api-config"
 import {
   clearStoredAuthUser,
   getAccessToken,
+  getRefreshToken,
   refreshSession,
 } from "@/lib/auth"
 import type { CouponDefinition } from "@/lib/offers"
@@ -296,7 +297,8 @@ storeApi.interceptors.response.use(
       error.response?.status !== 401 ||
       !originalRequest ||
       originalRequest._retry ||
-      shouldSkipRefresh
+      shouldSkipRefresh ||
+      !getRefreshToken()
     ) {
       return Promise.reject(error)
     }
