@@ -122,6 +122,7 @@ export type ProductFormData = {
   accent?: string
   imageLabel?: string
   images?: string[] | string
+  imageFit?: "cover" | "contain"
   description?: string
   stock?: number
   maxPerOrder?: number | null

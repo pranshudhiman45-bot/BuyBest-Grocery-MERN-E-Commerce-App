@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ProductImage } from "@/components/catalog/ProductImage";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { Button } from "@/components/ui/button";
 import {
@@ -2079,8 +2080,6 @@ export default function AdminPanel() {
                   <div className="space-y-3">
                     {filteredProducts.map((product) => {
                       const stock = Math.max(0, product.stock ?? 0);
-                      const hasImage = Boolean(product.images?.[0]);
-
                       return (
                         <div
                           key={product.id}
@@ -2095,17 +2094,15 @@ export default function AdminPanel() {
                           <div className="flex items-center justify-between gap-4 flex-1">
                             <div className="flex min-w-0 gap-4">
                               <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-[#edf8f1] text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-[#5a7c70]">
-                                {hasImage ? (
-                                  <img
-                                    src={product.images?.[0]}
-                                    alt={product.imageLabel}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="px-2 text-xs text-center">
-                                    {product.imageLabel || "No Image"}
-                                  </span>
-                                )}
+                                <ProductImage
+                                  src={product.images?.[0]}
+                                  alt={product.imageLabel || product.name}
+                                  width={112}
+                                  height={112}
+                                  fit={product.imageFit}
+                                  sizes="56px"
+                                  className="p-1"
+                                />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">

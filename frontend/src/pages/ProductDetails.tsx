@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useStore } from "@/components/providers/store-provider"
+import { ProductImage } from "@/components/catalog/ProductImage"
 import { fetchProductById, fetchProducts } from "@/lib/store-api"
 import { formatPrice, type Product } from "@/lib/storefront"
 import {
@@ -62,29 +63,13 @@ const ImagePlaceholder = ({
       backgroundImage: `linear-gradient(135deg, ${accent}25, #ffffff 65%)`,
     }}
   >
-    {src ? (
-      <img
-        src={src}
-        alt={label}
-        loading="lazy"
-        decoding="async"
-        className={[
-          fit === "contain"
-            ? "h-full w-full rounded-[24px] object-contain"
-            : "h-full w-full rounded-[24px] object-cover",
-          imageClassName,
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      />
-    ) : (
-      <div
-        className="rounded-full border border-dashed px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#1d4b3d]"
-        style={{ borderColor: accent }}
-      >
-        {label}
-      </div>
-    )}
+    <ProductImage
+      src={src}
+      alt={label}
+      fit={fit}
+      sizes="(max-width: 768px) 100vw, 50vw"
+      className={["rounded-[24px]", imageClassName].filter(Boolean).join(" ")}
+    />
   </div>
 )
 
@@ -326,7 +311,7 @@ const ProductDetails = () => {
                   accent={activeImage?.accent ?? product.accent}
                   src={activeImage?.imageUrl || product.images?.[0]}
                   className="h-[280px] w-full border-white/70 bg-white/95 sm:h-[360px]"
-                  fit="contain"
+                  fit={product.imageFit}
                   imageClassName="mx-auto p-4 sm:p-5"
                 />
               </div>
@@ -352,6 +337,7 @@ const ProductDetails = () => {
                     label={item.label}
                     accent={item.accent}
                     src={item.imageUrl}
+                    fit={product.imageFit}
                     className="h-28 w-full rounded-[16px]"
                   />
                 </button>
@@ -613,6 +599,7 @@ const ProductDetails = () => {
                         label={item.imageLabel}
                         accent={item.accent}
                         src={item.images?.[0]}
+                        fit={item.imageFit}
                         className="h-28 w-full rounded-[16px] bg-[#fbf8f2] sm:h-40 sm:rounded-[20px]"
                       />
                       <p className="mt-3 sm:mt-4 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.22em] text-[#91a599]">

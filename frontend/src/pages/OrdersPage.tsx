@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowLeft, Check, Circle, Clock3, Package, ShoppingBag } from "lucide-react"
+import { ArrowLeft, Check, Circle, Clock3, ShoppingBag } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { ProductImage } from "@/components/catalog/ProductImage"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { AuthUser } from "@/lib/auth"
 import {
@@ -165,7 +166,7 @@ const OrdersPage = ({ currentUser, selectedOrderId = null }: OrdersPageProps) =>
             {order.items.map((item, index) => (
               <div key={`${item.productId}-${index}`} className="grid grid-cols-[64px_1fr_auto] items-center gap-3 rounded-2xl bg-[#faf8f3] p-3">
                 <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl bg-white">
-                  {item.image ? <img src={item.image} alt={item.name} className="h-full w-full object-contain" /> : <Package className="size-6 text-[#789083]" />}
+                  <ProductImage src={item.image} alt={item.name} width={128} height={128} sizes="64px" className="p-1" />
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[#21352b]">{item.name}</p>

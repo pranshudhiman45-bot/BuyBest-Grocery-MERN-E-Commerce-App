@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import type { CartItem, CartSummary } from "@/lib/store-api"
 import { formatPrice } from "@/lib/storefront"
+import { ProductImage } from "@/components/catalog/ProductImage"
 
 const FREE_DELIVERY_THRESHOLD = 300
 
@@ -96,19 +97,14 @@ export function OrderSummaryCard({
                     >
                       <div className="flex min-w-0 items-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[#e8f5ee]">
-                          {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.name}
-                              loading="lazy"
-                              decoding="async"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                          <span className="text-xs font-bold text-[#a78410]">
-                              {item.name?.charAt(0)}
-                            </span>
-                          )}
+                          <ProductImage
+                            src={item.imageUrl}
+                            alt={item.name}
+                            width={80}
+                            height={80}
+                            sizes="40px"
+                            className="p-1"
+                          />
                         </div>
                         <div className="flex min-w-0 flex-col leading-tight">
                           <span className="truncate text-sm font-medium text-[#2c2417]">

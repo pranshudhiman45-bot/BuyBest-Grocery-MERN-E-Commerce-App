@@ -1,3 +1,5 @@
+import { ProductImage } from "@/components/catalog/ProductImage"
+
 type CartItemImageProps = {
   label: string
   accent: string
@@ -23,22 +25,14 @@ export function CartItemImage({
         backgroundImage: `linear-gradient(135deg, ${accent}28, #ffffff 70%)`,
       }}
     >
-      {src ? (
-        <img
-          src={src}
-          alt={label}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full rounded-[inherit] object-cover"
-        />
-      ) : (
-        <div
-          className="rounded-full border border-dashed px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#1d4b3d]"
-          style={{ borderColor: accent }}
-        >
-          {label}
-        </div>
-      )}
+      <ProductImage
+        src={src}
+        alt={label}
+        width={240}
+        height={240}
+        sizes="(max-width: 640px) 100vw, 240px"
+        className="rounded-[inherit] p-2"
+      />
     </div>
   )
 }

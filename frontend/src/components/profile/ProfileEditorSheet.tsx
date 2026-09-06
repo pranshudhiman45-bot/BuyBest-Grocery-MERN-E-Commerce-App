@@ -13,6 +13,7 @@ import {
   type OrderHistoryItem,
 } from "@/lib/auth"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ProductImage } from "@/components/catalog/ProductImage"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -476,15 +477,14 @@ export function ProfileEditorSheet({
                     >
                       <div className="flex gap-3">
                         <div className="flex h-15 w-15 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#efe4d1] bg-white">
-                          {order.productImage ? (
-                            <img
-                              src={order.productImage}
-                              alt={order.productName}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <PackageCheck className="h-6 w-6 text-[#b9a987]" />
-                          )}
+                          <ProductImage
+                            src={order.productImage}
+                            alt={order.productName}
+                            width={120}
+                            height={120}
+                            sizes="60px"
+                            className="p-1"
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">

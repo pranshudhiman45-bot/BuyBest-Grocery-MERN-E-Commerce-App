@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card"
+import { ProductImage } from "@/components/catalog/ProductImage"
 
 type CategoryCardProps = {
   title: string
@@ -12,12 +13,13 @@ export function CategoryCard({ title, image }: CategoryCardProps) {
         
         {/* Image circle */}
         <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-sm">
-          <img
+          <ProductImage
             src={image}
             alt={title}
-            loading="lazy"
-            decoding="async"
-            className="w-10 h-10 object-contain"
+            width={80}
+            height={80}
+            sizes="40px"
+            className="h-10 w-10"
           />
         </div>
 

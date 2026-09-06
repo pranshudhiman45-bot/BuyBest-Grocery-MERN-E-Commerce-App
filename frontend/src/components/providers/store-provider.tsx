@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { Check, ShoppingCart, X } from "lucide-react"
+import { ProductImage } from "@/components/catalog/ProductImage"
 
 import {
   addCartItem as addCartItemApi,
@@ -625,15 +626,14 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           <div className="pointer-events-auto w-full max-w-md animate-in fade-in-0 slide-in-from-bottom-4 zoom-in-95 overflow-hidden rounded-[18px] border border-[#d7eadf] bg-white shadow-[0_18px_48px_rgba(27,77,62,0.22)]">
             <div className="flex items-center gap-3 px-3 py-3">
               <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-[#edf3e7] bg-[#f8fcf6]">
-                {cartToast.imageUrl ? (
-                  <img
-                    src={cartToast.imageUrl}
-                    alt={cartToast.productName}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <ShoppingCart className="h-6 w-6 text-[#1B4D3E]" />
-                )}
+                <ProductImage
+                  src={cartToast.imageUrl}
+                  alt={cartToast.productName}
+                  width={112}
+                  height={112}
+                  sizes="56px"
+                  className="p-1"
+                />
                 <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1B4D3E] px-1 text-[10px] font-bold text-white">
                   {cartToast.quantity}
                 </span>

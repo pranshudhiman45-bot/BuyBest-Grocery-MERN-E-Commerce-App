@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ChevronDown, ChevronRight, Search, ShoppingBasket, SlidersHorizontal, Tag, X } from "lucide-react";
 
 import { useStore } from "@/components/providers/store-provider";
+import { ProductImage } from "@/components/catalog/ProductImage";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,40 +151,6 @@ const matchesSelectedCategory = (product: Product, categoryId: string) => {
   return product.category === categoryId;
 };
 
-const ImagePlaceholder = ({
-  label,
-  className,
-  src,
-}: {
-  label: string;
-  className?: string;
-  src?: string;
-}) => (
-  <div
-    className={`relative flex h-full w-full items-center justify-center overflow-hidden rounded-[18px] ${className || ""}`}
-    style={{ backgroundColor: "#ffffff" }}
-  >
-    {src ? (
-      <img
-        src={src}
-        alt={label}
-        loading="lazy"
-        decoding="async"
-        className="block h-full w-full object-contain object-center"
-      />
-    ) : (
-      <div className="flex h-full items-center justify-center px-4 text-center">
-        <div
-          className="rounded-full border border-dashed px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6d5e1a]"
-          style={{ borderColor: "#d8cfbf" }}
-        >
-          {label}
-        </div>
-      </div>
-    )}
-  </div>
-);
-
 const ProductCard = React.memo(function ProductCard({
   product,
   quantity,
@@ -272,10 +239,12 @@ const ProductCard = React.memo(function ProductCard({
             whileHover={{ scale: 1.05, rotate: -1.5 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
           >
-            <ImagePlaceholder
-              label={product.imageLabel}
+            <ProductImage
+              alt={product.imageLabel || product.name}
               src={product.images?.[0]}
-              className="mx-auto h-24 w-24 bg-white sm:h-28 sm:w-28"
+              fit={product.imageFit}
+              sizes="(max-width: 640px) 96px, 112px"
+              className="mx-auto h-24 w-24 rounded-[18px] bg-[#f7f5ef] p-1 sm:h-28 sm:w-28"
             />
           </motion.div>
         </div>
@@ -710,7 +679,7 @@ const Home = () => {
               <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2">
                 {derivedCategories.map((category) => (
                   <button key={category.id} type="button" onClick={() => selectCategory(category.id)} className="group min-w-28 snap-start rounded-2xl border border-[#ebe6dc] bg-[#fcfbf7] p-2 text-left transition hover:-translate-y-0.5 hover:border-[#b9d5c2] sm:min-w-32">
-                    <div className="h-20 overflow-hidden rounded-xl bg-white">{category.image ? <img src={category.image} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : null}</div>
+                    <div className="h-20 overflow-hidden rounded-xl bg-[#f7f5ef]"><ProductImage src={category.image} alt={`${category.name} category`} width={320} height={200} fit="cover" sizes="128px" className="transition duration-300 group-hover:scale-105" /></div>
                     <span className="mt-2 block text-xs font-semibold leading-4 text-[#334a3e]">{category.name}</span>
                   </button>
                 ))}

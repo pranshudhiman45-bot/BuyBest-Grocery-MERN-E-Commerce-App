@@ -99,6 +99,7 @@ const buildProductPayload = (input = {}, existingProduct = null) => {
     accent,
     imageLabel,
     images,
+    imageFit: input.imageFit === 'contain' ? 'contain' : existingProduct?.imageFit || 'cover',
     description: String(input.description || '').trim(),
     stock: Number(input.stock) || 0,
     maxPerOrder: normalizeMaxPerOrder(input.maxPerOrder, existingProduct?.maxPerOrder ?? null),
@@ -149,6 +150,7 @@ const mapProductToStorefront = (productDocument) => {
     accent: product.accent,
     imageLabel: product.imageLabel || product.name,
     images,
+    imageFit: product.imageFit === 'contain' ? 'contain' : 'cover',
     description: product.description || undefined,
     stock: product.stock,
     maxPerOrder:

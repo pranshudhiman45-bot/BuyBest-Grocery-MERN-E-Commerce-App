@@ -27,6 +27,7 @@ export type Product = {
   accent: string
   imageLabel: string
   images?: string[]
+  imageFit?: "cover" | "contain"
   description?: string
   stock?: number
   maxPerOrder?: number | null

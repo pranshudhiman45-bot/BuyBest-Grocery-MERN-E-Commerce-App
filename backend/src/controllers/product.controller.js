@@ -43,6 +43,10 @@ const validateProductPayload = (payload) => {
   }
 
   const hasInvalidImage = payload.images.some((imageUrl) => {
+    if (/^\/products\/[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*\.(avif|webp)$/i.test(imageUrl)) {
+      return false
+    }
+
     try {
       const url = new URL(imageUrl)
       return !['http:', 'https:'].includes(url.protocol)
@@ -52,7 +56,7 @@ const validateProductPayload = (payload) => {
   })
 
   if (hasInvalidImage) {
-    throw new AppError('Product images must use valid HTTP or HTTPS URLs', 400)
+    throw new AppError('Product images must use a local /products asset or a valid HTTP or HTTPS URL', 400)
   }
 }
 

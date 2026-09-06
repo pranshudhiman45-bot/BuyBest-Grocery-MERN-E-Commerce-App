@@ -65,6 +65,11 @@ const productSchema = new mongoose.Schema(
       type: [String],
       default: []
     },
+    imageFit: {
+      type: String,
+      enum: ['cover', 'contain'],
+      default: 'cover'
+    },
     description: {
       type: String,
       default: ''
