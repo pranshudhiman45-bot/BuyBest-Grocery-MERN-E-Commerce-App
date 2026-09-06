@@ -136,17 +136,27 @@ const getSocketToken = async user => {
   }
 }
 
-const formatOrderHistoryItem = order => ({
+const formatOrderHistoryItem = order => {
+  const orderItems = Array.isArray(order.items) && order.items.length > 0
+    ? order.items
+    : null
+
+  return {
   id: order._id.toString(),
   orderId: order.orderId,
-  productName: order.productDetails?.name || 'Product',
-  productImage: Array.isArray(order.productDetails?.image)
-    ? order.productDetails.image[0] || null
-    : null,
+  productName: orderItems
+    ? `${orderItems[0]?.name || 'Product'}${orderItems.length > 1 ? ` +${orderItems.length - 1} more` : ''}`
+    : order.productDetails?.name || 'Product',
+  productImage: orderItems
+    ? orderItems[0]?.image || null
+    : Array.isArray(order.productDetails?.image)
+      ? order.productDetails.image[0] || null
+      : null,
   quantity: order.quantity,
   total: order.total,
   paymentMethod: order.paymentMethod,
   paymentStatus: order.paymentStatus,
+  orderStatus: order.orderStatus || (order.paymentStatus === 'completed' ? 'confirmed' : 'placed'),
   couponCode: order.couponCode,
   createdAt: order.createdAt,
   deliveryAddress:
@@ -158,7 +168,8 @@ const formatOrderHistoryItem = order => ({
           postalCode: order.deliveryAddress.postalCode
         }
       : null
-})
+  }
+}
 
 const getOrderHistory = async user => {
   if (!user?._id) {
@@ -166,7 +177,13 @@ const getOrderHistory = async user => {
   }
 
   const orders = await orderModel
-    .find({ userId: user._id })
+    .find({
+      userId: user._id,
+      $or: [
+        { paymentMethod: 'cash_on_delivery' },
+        { paymentStatus: 'completed' }
+      ]
+    })
     .populate({
       path: 'deliveryAddress',
       select: 'addresLine city state postalCode'
@@ -614,85 +631,90 @@ const uploadAvatar = async (currentUser, file) => {
 
 
 const updateUserProfile = async (user, body) => {
-  try {
-    if (!user) {
-      return {
-        statusCode: 404,
-        body: {
-          message: "User not found",
-          success: false
-        }
-      };
-    }
-
-    const { name, email, password, mobile } = body;
-
-    if (name) user.name = name;
-    if (mobile) user.mobile = mobile;
-    
-    let passwordOtpSent = false;
-    if (password) {
-      const otp = generateOtp();
-      user.passwordVerifyOtp = hashOtp(otp);
-      user.passwordVerifyOtpExpire = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000);
-      await emailService.sendVerificationOtpEmail(
-        user.email,
-        user.name,
-        otp,
-        env.otpExpiryMinutes
-      );
-      passwordOtpSent = true;
-    }
-
-    if (email && email !== user.email) {
-      const emailExists = await userModel.findOne({ email });
-      if (emailExists) {
-        return {
-          statusCode: 422,
-          body: {
-            message: "Email already in use",
-            success: false
-          }
-        };
-      }
-      user.pendingEmail = email;
-      const otp = generateOtp();
-      user.emailVerifyOtp = hashOtp(otp);
-      user.emailVerifyOtpExpire = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000);
-      await emailService.sendVerificationOtpEmail(
-        email,
-        user.name,
-        otp,
-        env.otpExpiryMinutes
-      );
-    }
-
-    await user.save();
-
-    return {
-      statusCode: 200,
-      body: {
-        message: user.pendingEmail || passwordOtpSent ? "Verification OTP(s) sent to your email" : "Profile updated successfully",
-        requiresEmailOtp: !!user.pendingEmail,
-        requiresPasswordOtp: passwordOtpSent,
-        user: buildUserResponse(user),
-        success: true
-      }
-    };
-
-  } catch (error) {
-    return {
-      statusCode: 500,
-      body: {
-        message: "Failed to update profile",
-        error: error.message,
-        success: false
-      }
-    };
+  if (!user) {
+    throw new AppError('User not found', 404)
   }
-};
+
+  const normalizedName = String(body.name || '').trim()
+  const normalizedEmail = String(body.email || '').trim().toLowerCase()
+  const normalizedMobile = String(body.mobile || '').trim()
+  const password = String(body.password || '')
+
+  if (!normalizedName || normalizedName.length > 80) {
+    throw new AppError('Name must contain between 1 and 80 characters', 400)
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizedEmail)) {
+    throw new AppError('Please provide a valid email address', 400)
+  }
+
+  if (normalizedMobile && !/^[6-9][0-9]{9}$/.test(normalizedMobile)) {
+    throw new AppError('Please provide a valid 10-digit Indian mobile number', 400)
+  }
+
+  if (password && password.length < 6) {
+    throw new AppError('Password must be at least 6 characters long', 400)
+  }
+
+  user.name = normalizedName
+  user.mobile = normalizedMobile || null
+
+  let passwordOtpSent = false
+  if (password) {
+    const otp = generateOtp()
+    user.passwordVerifyOtp = hashOtp(otp)
+    user.passwordVerifyOtpExpire = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000)
+    await emailService.sendVerificationOtpEmail(
+      user.email,
+      user.name,
+      otp,
+      env.otpExpiryMinutes
+    )
+    passwordOtpSent = true
+  }
+
+  if (normalizedEmail !== user.email) {
+    const emailExists = await userModel.findOne({
+      email: normalizedEmail,
+      _id: { $ne: user._id }
+    })
+    if (emailExists) {
+      throw new AppError('Email already in use', 422)
+    }
+
+    user.pendingEmail = normalizedEmail
+    const otp = generateOtp()
+    user.emailVerifyOtp = hashOtp(otp)
+    user.emailVerifyOtpExpire = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000)
+    await emailService.sendVerificationOtpEmail(
+      normalizedEmail,
+      user.name,
+      otp,
+      env.otpExpiryMinutes
+    )
+  }
+
+  await user.save()
+
+  return {
+    statusCode: 200,
+    body: {
+      message: user.pendingEmail || passwordOtpSent
+        ? 'Verification OTP(s) sent to your email'
+        : 'Profile updated successfully',
+      requiresEmailOtp: Boolean(user.pendingEmail),
+      requiresPasswordOtp: passwordOtpSent,
+      user: buildUserResponse(user),
+      success: true
+    }
+  }
+}
 const verifyNewEmail = async (user, body) => {
   const { otp } = body;
+
+  if (!otp) {
+    throw new AppError('Email verification OTP is required', 400)
+  }
 
   if (!user || !user.pendingEmail) {
     return {
@@ -735,6 +757,10 @@ const verifyNewEmail = async (user, body) => {
 
 const verifyNewPassword = async (user, body) => {
   const { otp, newPassword } = body;
+
+  if (!otp || typeof newPassword !== 'string' || newPassword.length < 6) {
+    throw new AppError('A valid OTP and password of at least 6 characters are required', 400)
+  }
 
   if (!user || !user.passwordVerifyOtp) {
     return {

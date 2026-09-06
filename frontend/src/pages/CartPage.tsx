@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
-import { ArrowLeft, Leaf, ShieldCheck, Truck } from "lucide-react"
+import { ArrowLeft, Boxes, ShieldCheck } from "lucide-react"
 
 import { useStore } from "@/components/providers/store-provider"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ const CartPage = ({ currentUser = null }: CartPageProps) => {
   const {
     cartItems,
     cartSummary,
+    clearCart,
     isCartLoading,
     removeFromCart,
     updateCartQuantity,
@@ -135,9 +136,9 @@ const CartPage = ({ currentUser = null }: CartPageProps) => {
               </div>
               <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
                 <div className="rounded-[18px] border border-[#ece4d6] bg-white/80 p-3 shadow-sm">
-                  <Truck className="h-5 w-5 text-[#a78410]" />
-                  <p className="mt-2 text-sm font-semibold text-[#2c2417]">Express dispatch</p>
-                  <p className="mt-1 text-sm text-[#7d6d52]">Faster route allocation for active orders.</p>
+                  <Boxes className="h-5 w-5 text-[#16834a]" />
+                  <p className="mt-2 text-sm font-semibold text-[#2c2417]">Live inventory</p>
+                  <p className="mt-1 text-sm text-[#7d6d52]">Availability is checked again when the order is placed.</p>
                 </div>
                 <div className="rounded-[18px] border border-[#ece4d6] bg-white/80 p-3 shadow-sm">
                   <ShieldCheck className="h-5 w-5 text-[#a78410]" />
@@ -145,8 +146,8 @@ const CartPage = ({ currentUser = null }: CartPageProps) => {
                   <p className="mt-1 text-sm text-[#7d6d52]">Payment happens on a dedicated, focused screen.</p>
                 </div>
                 <div className="rounded-[18px] border border-[#ece4d6] bg-white/80 p-3 shadow-sm">
-                  <Leaf className="h-5 w-5 text-[#a78410]" />
-                  <p className="mt-2 text-sm font-semibold text-[#2c2417]">Fresh picks</p>
+                  <Boxes className="h-5 w-5 text-[#a78410]" />
+                  <p className="mt-2 text-sm font-semibold text-[#2c2417]">Your selections</p>
                   <p className="mt-1 text-sm text-[#7d6d52]">{uniqueProductCount} unique products ready for checkout.</p>
                 </div>
               </div>
@@ -167,8 +168,18 @@ const CartPage = ({ currentUser = null }: CartPageProps) => {
                     Adjust quantities, remove items, and fine-tune the order before payment.
                   </p>
                 </div>
-                <div className="rounded-full bg-[#fff7dd] px-4 py-2 text-sm font-medium text-[#6a5620] ring-1 ring-[#efe4bf]">
-                  {cartSummary.itemCount} items across {uniqueProductCount} products
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-full bg-[#fff7dd] px-4 py-2 text-sm font-medium text-[#6a5620] ring-1 ring-[#efe4bf]">
+                    {cartSummary.itemCount} items across {uniqueProductCount} products
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full border-[#decfba] bg-white text-[#735d3d] hover:bg-[#fff8ed]"
+                    onClick={() => void clearCart()}
+                  >
+                    Clear cart
+                  </Button>
                 </div>
               </div>
             </div>

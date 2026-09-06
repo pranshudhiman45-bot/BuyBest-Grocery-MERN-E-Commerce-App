@@ -12,6 +12,50 @@ const {
 const escapeRegex = (value = '') =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+const parseLimit = (value, fallback = null) => {
+  const parsed = Math.floor(Number(value))
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 100) : fallback
+}
+
+const validateProductPayload = (payload) => {
+  if (!payload.slug || !payload.name || !payload.category) {
+    throw new AppError('Name, category, and a valid slug are required', 400)
+  }
+
+  if (!payload.brand || !payload.size || !payload.description) {
+    throw new AppError('Brand, pack size, and description are required', 400)
+  }
+
+  if (!Number.isFinite(payload.price) || payload.price <= 0) {
+    throw new AppError('Price must be greater than zero', 400)
+  }
+
+  if (!Number.isInteger(payload.stock) || payload.stock < 0) {
+    throw new AppError('Stock must be a whole number of zero or more', 400)
+  }
+
+  if (payload.originalPrice !== null && payload.originalPrice < payload.price) {
+    throw new AppError('Original price cannot be lower than the selling price', 400)
+  }
+
+  if (!payload.images.length) {
+    throw new AppError('At least one product image is required', 400)
+  }
+
+  const hasInvalidImage = payload.images.some((imageUrl) => {
+    try {
+      const url = new URL(imageUrl)
+      return !['http:', 'https:'].includes(url.protocol)
+    } catch {
+      return true
+    }
+  })
+
+  if (hasInvalidImage) {
+    throw new AppError('Product images must use valid HTTP or HTTPS URLs', 400)
+  }
+}
+
 const listProducts = asyncHandler(async (req, res) => {
   const { category = '', limit } = req.query
   await ensureStorefrontSeeded()
@@ -27,8 +71,8 @@ const listProducts = asyncHandler(async (req, res) => {
     products = products.filter((product) => product.category === String(category))
   }
 
-  const parsedLimit = Number(limit)
-  if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+  const parsedLimit = parseLimit(limit)
+  if (parsedLimit) {
     products = products.slice(0, parsedLimit)
   }
 
@@ -48,6 +92,8 @@ const searchProducts = asyncHandler(async (req, res) => {
           { brand: { $regex: safeQuery, $options: 'i' } },
           { category: { $regex: safeQuery, $options: 'i' } },
           { categoryLabel: { $regex: safeQuery, $options: 'i' } },
+          { subcategory: { $regex: safeQuery, $options: 'i' } },
+          { tags: { $regex: safeQuery, $options: 'i' } },
           { size: { $regex: safeQuery, $options: 'i' } },
           { offer: { $regex: safeQuery, $options: 'i' } }
         ]
@@ -59,8 +105,8 @@ const searchProducts = asyncHandler(async (req, res) => {
     .filter((product) => product.publish !== false)
     .map(mapProductToStorefront)
 
-  const parsedLimit = Number(limit)
-  if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+  const parsedLimit = parseLimit(limit)
+  if (parsedLimit) {
     products = products.slice(0, parsedLimit)
   }
 
@@ -83,9 +129,7 @@ const createProduct = asyncHandler(async (req, res) => {
 
   const payload = buildProductPayload(req.body)
 
-  if (!payload.slug || !payload.name || !payload.category) {
-    throw new AppError('Name, category, and a valid slug are required', 400)
-  }
+  validateProductPayload(payload)
 
   const existingProduct = await productModel.findOne({ slug: payload.slug })
 
@@ -120,6 +164,7 @@ const updateProduct = asyncHandler(async (req, res) => {
   }
 
   const payload = buildProductPayload(req.body, existingProduct)
+  validateProductPayload(payload)
 
   if (payload.slug !== existingProduct.slug) {
     const duplicateProduct = await productModel.findOne({ slug: payload.slug })

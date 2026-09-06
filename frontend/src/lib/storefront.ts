@@ -18,6 +18,7 @@ export type Product = {
   brand: string
   category: string
   categoryLabel: string
+  subcategory?: string
   size: string
   price: number
   originalPrice?: number
@@ -37,6 +38,9 @@ export type Product = {
   relatedIds?: string[]
   isBestSeller?: boolean
   isNewArrival?: boolean
+  featured?: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
 }
 
 export const formatPrice = (price: number) => {

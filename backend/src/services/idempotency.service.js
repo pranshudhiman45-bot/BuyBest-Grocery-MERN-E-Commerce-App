@@ -4,11 +4,14 @@ const idempotencyModel = require('../models/idempotency.model.js')
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000
 
 const buildRequestFingerprint = (req) => {
+  const authCredential =
+    req.cookies?.accessToken || req.headers.authorization || 'anonymous'
   const payload = {
     method: req.method,
     path: req.originalUrl,
     body: req.body ?? null,
-    query: req.query ?? null
+    query: req.query ?? null,
+    authScope: crypto.createHash('sha256').update(authCredential).digest('hex')
   }
 
   return crypto
@@ -96,7 +99,7 @@ const completeRequest = async ({ key, statusCode, headers, body, ttlMs = DEFAULT
         expiresAt: new Date(Date.now() + ttlMs)
       }
     },
-    { new: true }
+    { returnDocument: 'after' }
   )
 }
 

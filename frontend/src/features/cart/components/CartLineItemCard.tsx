@@ -1,5 +1,5 @@
-import { Minus, Plus, ShieldCheck, Star, Trash2, Truck } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Minus, PackageCheck, Plus, Trash2 } from "lucide-react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -22,24 +22,15 @@ export function CartLineItemCard({
   onIncrease,
   onRemove,
 }: CartLineItemCardProps) {
-  const extendedItem = item as CartItem & {
-    deliveryTime?: string
-    rating?: number
-    reviewCount?: number
-    originalPrice?: number
-  }
-  const [localQty, setLocalQty] = useState(item.quantity)
+  const [optimisticQuantity, setOptimisticQuantity] = useState<number | null>(null)
   const [loadingAction, setLoadingAction] = useState<"inc" | "dec" | "remove" | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
   const [actionError, setActionError] = useState("")
+  const localQty = optimisticQuantity ?? item.quantity
   const maxPerOrder =
     item.maxPerOrder && item.maxPerOrder > 0 ? Math.floor(item.maxPerOrder) : null
   const purchasableLimit = maxPerOrder === null ? item.stock : Math.min(item.stock, maxPerOrder)
   const isAtStockLimit = purchasableLimit > 0 && localQty >= purchasableLimit
-
-  useEffect(() => {
-    setLocalQty(item.quantity)
-  }, [item.quantity])
 
   return (
     <Card
@@ -60,8 +51,8 @@ export function CartLineItemCard({
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7b9489]">
               {item.brand || item.category}
             </p>
-            <span className="rounded-full bg-[#fff3d0] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6a5620]">
-              Fresh pick
+            <span className="rounded-full bg-[#edf8f1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#176942]">
+              {item.stock} in stock
             </span>
           </div>
 
@@ -81,26 +72,10 @@ export function CartLineItemCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#7d6d52] sm:gap-2 sm:text-xs">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 ring-1 ring-[#ece4d6]">
-              <Truck className="h-3.5 w-3.5 text-[#a78410]" />
-              {extendedItem.deliveryTime
-                ? `Delivery in ${extendedItem.deliveryTime}`
-                : "Delivery within 10-20 mins"}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 ring-1 ring-[#ece4d6]">
-              <ShieldCheck className="h-3.5 w-3.5 text-[#a78410]" />
-              Quality checked
+              <PackageCheck className="h-3.5 w-3.5 text-[#16834a]" />
+              Price and stock rechecked at checkout
             </span>
           </div>
-
-          {extendedItem.rating ? (
-            <div className="mt-3 flex items-center gap-1 text-sm font-medium text-[#b87410]">
-              <Star className="h-4 w-4 fill-[#f59e0b] stroke-[#f59e0b]" />
-              <span>{extendedItem.rating}</span>
-              {extendedItem.reviewCount ? (
-                <span className="text-[#80998e]">({extendedItem.reviewCount} reviews)</span>
-              ) : null}
-            </div>
-          ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-2.5">
             <div className="inline-flex items-center gap-3 rounded-xl border border-[#ece4d6] bg-white px-2.5 py-1.5 shadow-sm">
@@ -112,18 +87,18 @@ export function CartLineItemCard({
                   setActionError("")
 
                   const newQty = Math.max(1, localQty - 1)
-                  setLocalQty(newQty)
+                  setOptimisticQuantity(newQty)
 
                   try {
                     await onDecrease(item.productId, newQty)
                   } catch (error) {
-                    setLocalQty(item.quantity)
                     setActionError(
                       error instanceof Error
                         ? error.message
                         : "Unable to update quantity right now."
                     )
                   } finally {
+                    setOptimisticQuantity(null)
                     setLoadingAction(null)
                   }
                 }}
@@ -143,18 +118,18 @@ export function CartLineItemCard({
                   setActionError("")
 
                   const newQty = localQty + 1
-                  setLocalQty(newQty)
+                  setOptimisticQuantity(newQty)
 
                   try {
                     await onIncrease(item.productId, newQty)
                   } catch (error) {
-                    setLocalQty(item.quantity)
                     setActionError(
                       error instanceof Error
                         ? error.message
                         : "Unable to update quantity right now."
                     )
                   } finally {
+                    setOptimisticQuantity(null)
                     setLoadingAction(null)
                   }
                 }}
@@ -196,11 +171,6 @@ export function CartLineItemCard({
               {formatPrice(item.price)} each
             </div>
 
-            {extendedItem.originalPrice && extendedItem.originalPrice > item.price ? (
-              <div className="text-xs font-semibold text-[#a78410] lg:text-right">
-                Saved {formatPrice((extendedItem.originalPrice - item.price) * localQty)}
-              </div>
-            ) : null}
           </div>
 
           <Button

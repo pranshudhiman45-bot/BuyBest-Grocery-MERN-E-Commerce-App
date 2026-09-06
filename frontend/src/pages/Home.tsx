@@ -10,11 +10,12 @@ import {
   useTransition,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Search, ShoppingBasket, SlidersHorizontal, Tag, X } from "lucide-react";
 
 import { useStore } from "@/components/providers/store-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatagories, fetchProducts } from "@/lib/store-api";
 import { formatPrice, type Category, type Product } from "@/lib/storefront";
 import {
@@ -27,18 +28,18 @@ const PRODUCTS_PER_PAGE = 16;
 const DEFAULT_MAX_PRICE = 100000;
 const SPECIAL_CATEGORY_ALL = "all";
 const SPECIAL_CATEGORY_NEW_ARRIVALS = "new-arrivals";
-const SPECIAL_CATEGORY_BEST_SELLERS = "best-sellers";
+const SPECIAL_CATEGORY_FEATURED = "featured";
 
 const specialCollections = [
   {
     id: SPECIAL_CATEGORY_NEW_ARRIVALS,
     name: "New Arrivals",
-    description: "New and trending products in our store",
+    description: "Recently added products in our catalog",
   },
   {
-    id: SPECIAL_CATEGORY_BEST_SELLERS,
-    name: "Best Sellers",
-    description: "Top products picked by customers",
+    id: SPECIAL_CATEGORY_FEATURED,
+    name: "Featured",
+    description: "Products selected by the store team",
   },
 ] as const;
 
@@ -71,6 +72,8 @@ const staggerContainerVariant = {
 
 type FilterState = {
   selectedBrand: string;
+  selectedSubcategory: string;
+  inStockOnly: boolean;
   minimumDiscount: number;
   maxPrice: number;
   sortBy: string;
@@ -80,6 +83,8 @@ type FilterState = {
 
 type FilterAction =
   | { type: "set-brand"; value: string }
+  | { type: "set-subcategory"; value: string }
+  | { type: "set-in-stock"; value: boolean }
   | { type: "set-discount"; value: number }
   | { type: "set-max-price"; value: number }
   | { type: "set-sort"; value: string }
@@ -90,9 +95,11 @@ type FilterAction =
 
 const initialFilterState: FilterState = {
   selectedBrand: "all",
+  selectedSubcategory: "all",
+  inStockOnly: false,
   minimumDiscount: 0,
   maxPrice: DEFAULT_MAX_PRICE,
-  sortBy: "latest",
+  sortBy: "recommended",
   currentPage: 1,
   showFilters: false,
 };
@@ -104,6 +111,10 @@ const filterReducer = (
   switch (action.type) {
     case "set-brand":
       return { ...state, selectedBrand: action.value, currentPage: 1 };
+    case "set-subcategory":
+      return { ...state, selectedSubcategory: action.value, currentPage: 1 };
+    case "set-in-stock":
+      return { ...state, inStockOnly: action.value, currentPage: 1 };
     case "set-discount":
       return { ...state, minimumDiscount: action.value, currentPage: 1 };
     case "set-max-price":
@@ -132,8 +143,8 @@ const matchesSelectedCategory = (product: Product, categoryId: string) => {
     return Boolean(product.isNewArrival);
   }
 
-  if (categoryId === SPECIAL_CATEGORY_BEST_SELLERS) {
-    return Boolean(product.isBestSeller);
+  if (categoryId === SPECIAL_CATEGORY_FEATURED) {
+    return Boolean(product.featured);
   }
 
   return product.category === categoryId;
@@ -206,9 +217,9 @@ const ProductCard = React.memo(function ProductCard({
         )
       : 0;
   const badges = [
-    product.isBestSeller
+    product.featured
       ? {
-          label: "Best Seller",
+          label: "Featured",
           className: "bg-[#ffe7a6] text-[#6a4a00] border-[#f2d276]",
         }
       : null,
@@ -357,6 +368,8 @@ const Home = () => {
   const deferredProducts = useDeferredValue(products);
   const deferredSelectedCategory = useDeferredValue(selectedCategory);
   const deferredSelectedBrand = useDeferredValue(filters.selectedBrand);
+  const deferredSelectedSubcategory = useDeferredValue(filters.selectedSubcategory);
+  const deferredInStockOnly = useDeferredValue(filters.inStockOnly);
   const deferredMinimumDiscount = useDeferredValue(filters.minimumDiscount);
   const deferredMaxPrice = useDeferredValue(filters.maxPrice);
   const deferredSortBy = useDeferredValue(filters.sortBy);
@@ -468,6 +481,15 @@ const Home = () => {
     return topBrands;
   }, [deferredProducts, deferredSelectedBrand, deferredSelectedCategory]);
 
+  const availableSubcategories = useMemo(() => {
+    const values = deferredProducts
+      .filter((product) => matchesSelectedCategory(product, deferredSelectedCategory))
+      .map((product) => product.subcategory?.trim())
+      .filter((value): value is string => Boolean(value));
+
+    return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+  }, [deferredProducts, deferredSelectedCategory]);
+
   const filteredProducts = useMemo(() => {
     const nextProducts = deferredProducts
       .filter((product) =>
@@ -478,6 +500,12 @@ const Home = () => {
           ? true
           : product.brand === deferredSelectedBrand,
       )
+      .filter((product) =>
+        deferredSelectedSubcategory === "all"
+          ? true
+          : product.subcategory === deferredSelectedSubcategory,
+      )
+      .filter((product) => !deferredInStockOnly || Number(product.stock || 0) > 0)
       .filter((product) => product.price <= deferredMaxPrice)
       .filter((product) => {
         const discount =
@@ -507,6 +535,9 @@ const Home = () => {
         case "name":
           return left.name.localeCompare(right.name);
         case "latest":
+          return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
+        case "recommended":
+          return Number(Boolean(right.featured)) - Number(Boolean(left.featured));
         case "relevance":
         default:
           return 0;
@@ -515,9 +546,11 @@ const Home = () => {
   }, [
     deferredMaxPrice,
     deferredMinimumDiscount,
+    deferredInStockOnly,
     deferredProducts,
     deferredSelectedCategory,
     deferredSelectedBrand,
+    deferredSelectedSubcategory,
     deferredSortBy,
   ]);
 
@@ -617,6 +650,19 @@ const Home = () => {
     [dispatchShell, selectedCategory],
   );
 
+  const featuredProducts = useMemo(
+    () => products.filter((product) => product.featured).slice(0, 6),
+    [products],
+  );
+  const newArrivalProducts = useMemo(
+    () => products.filter((product) => product.isNewArrival).slice(0, 6),
+    [products],
+  );
+  const catalogBrands = useMemo(
+    () => Array.from(new Set(products.map((product) => product.brand).filter(Boolean))).slice(0, 12),
+    [products],
+  );
+
   return (
     <motion.div
       className="min-h-full bg-[#f7f4ee] text-[#262118]"
@@ -635,7 +681,61 @@ const Home = () => {
           </Alert>
         ) : null}
 
-        <motion.div
+        {selectedCategory === SPECIAL_CATEGORY_ALL ? (
+          <>
+            <motion.section variants={fadeUpVariant} className="overflow-hidden rounded-[28px] border border-[#dfe7df] bg-[linear-gradient(120deg,#173f32_0%,#205742_58%,#f2c94c_180%)] px-5 py-7 text-white shadow-[0_18px_42px_rgba(23,63,50,0.16)] sm:px-8 sm:py-9">
+              <div className="grid items-center gap-6 md:grid-cols-[1fr_auto]">
+                <div className="max-w-2xl">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#cce9d5]">Buy Best grocery</p>
+                  <h1 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">Your weekly shop, easier to finish.</h1>
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-white/75 sm:text-base">Browse a practical catalog of groceries and household essentials, check live stock, and place a stored order from one responsive storefront.</p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Button type="button" className="rounded-full bg-[#f2c94c] text-[#263129] hover:bg-[#e4bb3e]" onClick={() => document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" })}>
+                      Shop groceries <ArrowRight className="size-4" />
+                    </Button>
+                    <Button type="button" variant="outline" className="rounded-full border-white/30 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={() => dispatchShell(appShellActions.openOffers())}>
+                      <Tag className="size-4" /> View available offers
+                    </Button>
+                  </div>
+                </div>
+                <div className="hidden size-36 items-center justify-center rounded-full border border-white/15 bg-white/10 md:flex"><ShoppingBasket className="size-16 text-[#f2c94c]" /></div>
+              </div>
+            </motion.section>
+
+            <motion.section id="categories" variants={fadeUpVariant} className="rounded-[24px] border border-[#e8e4da] bg-white p-4 shadow-[0_8px_24px_rgba(78,62,31,0.05)] sm:p-5">
+              <div className="flex items-end justify-between gap-3">
+                <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#16834a]">Browse faster</p><h2 className="mt-1 text-xl font-bold text-[#2c2417]">Shop by category</h2></div>
+                <button type="button" onClick={() => document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()} className="hidden items-center gap-1.5 text-sm font-semibold text-[#176942] sm:inline-flex"><Search className="size-4" />Search catalog</button>
+              </div>
+              <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2">
+                {derivedCategories.map((category) => (
+                  <button key={category.id} type="button" onClick={() => selectCategory(category.id)} className="group min-w-28 snap-start rounded-2xl border border-[#ebe6dc] bg-[#fcfbf7] p-2 text-left transition hover:-translate-y-0.5 hover:border-[#b9d5c2] sm:min-w-32">
+                    <div className="h-20 overflow-hidden rounded-xl bg-white">{category.image ? <img src={category.image} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : null}</div>
+                    <span className="mt-2 block text-xs font-semibold leading-4 text-[#334a3e]">{category.name}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.section>
+
+            {featuredProducts.length > 0 ? (
+              <motion.section variants={fadeUpVariant} className="space-y-3">
+                <div className="flex items-end justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#16834a]">Store selection</p><h2 className="mt-1 text-xl font-bold text-[#2c2417]">Featured essentials</h2></div><button type="button" className="text-sm font-semibold text-[#176942]" onClick={() => selectCategory(SPECIAL_CATEGORY_FEATURED)}>View all</button></div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 lg:grid-cols-6">
+                  {featuredProducts.map((product) => <ProductCard key={`featured-${product.id}`} product={product} quantity={cartQuantities[product.id] ?? 0} onNavigate={(id) => dispatchShell(appShellActions.openProduct(id))} onAdd={(id) => handleCartAction(() => addToCart(id, 1))} onUpdate={(id, value) => handleCartAction(() => updateQuantity(id, value))} />)}
+                </div>
+              </motion.section>
+            ) : null}
+
+            {newArrivalProducts.length > 0 || catalogBrands.length > 0 ? (
+              <motion.section variants={fadeUpVariant} className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-[22px] border border-[#e8e4da] bg-white p-5"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#16834a]">Recently added</p><h2 className="mt-1 text-xl font-bold text-[#2c2417]">New arrivals</h2><div className="mt-3 flex flex-wrap gap-2">{newArrivalProducts.map((product) => <button key={product.id} type="button" onClick={() => dispatchShell(appShellActions.openProduct(product.id))} className="rounded-full border border-[#dfe7e1] bg-[#f8fbf9] px-3 py-2 text-sm font-medium text-[#40594c] hover:border-[#a8c9b4]">{product.name}</button>)}</div></div>
+                <div className="rounded-[22px] border border-[#e8e4da] bg-white p-5"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#16834a]">Available brands</p><h2 className="mt-1 text-xl font-bold text-[#2c2417]">Brands in this catalog</h2><div className="mt-3 flex flex-wrap gap-2">{catalogBrands.map((brand) => <button key={brand} type="button" onClick={() => dispatch({ type: "set-brand", value: brand })} className="rounded-full border border-[#e8e2d8] bg-[#fbf8f2] px-3 py-2 text-sm font-medium text-[#5f5238] hover:border-[#c9b993]">{brand}</button>)}</div></div>
+              </motion.section>
+            ) : null}
+          </>
+        ) : null}
+
+        <motion.div id="catalog"
           variants={fadeUpVariant}
           className="rounded-[22px] border border-[#ece4d6] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(78,62,31,0.05)]"
         >
@@ -667,6 +767,8 @@ const Home = () => {
             >
               <button
                 type="button"
+                aria-controls="catalog-filter-panel"
+                aria-expanded={filters.showFilters}
                 onClick={() =>
                   startFilterTransition(() => {
                     dispatch({ type: "toggle-filters" });
@@ -685,9 +787,35 @@ const Home = () => {
                 <SlidersHorizontal className="size-4 text-[#8c7d60] lg:hidden" />
               </button>
 
+              {filters.showFilters ? (
+                <button
+                  type="button"
+                  aria-label="Close filters"
+                  className="fixed inset-0 z-40 bg-black/35 lg:hidden"
+                  onClick={() => dispatch({ type: "toggle-filters" })}
+                />
+              ) : null}
+
               <div
-                className={`${filters.showFilters ? "block" : "hidden"} border-t border-[#f2eadc] lg:block`}
+                id="catalog-filter-panel"
+                className={`${filters.showFilters ? "fixed inset-x-3 bottom-20 top-16 z-50 block overflow-y-auto rounded-3xl border border-[#e8decc] bg-white shadow-2xl" : "hidden"} border-t border-[#f2eadc] lg:static lg:block lg:overflow-visible lg:rounded-none lg:border-x-0 lg:border-b-0 lg:shadow-none`}
               >
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#eee5d8] bg-white/95 px-5 py-4 backdrop-blur lg:hidden">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#16834a]">Catalog</p>
+                    <h2 className="text-lg font-bold text-[#2f281b]">Filters</h2>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close filters"
+                    className="rounded-full"
+                    onClick={() => dispatch({ type: "toggle-filters" })}
+                  >
+                    <X className="size-5" />
+                  </Button>
+                </div>
                 <div className="px-3 py-3">
                   <button
                     type="button"
@@ -752,6 +880,34 @@ const Home = () => {
                     ))}
                   </div>
                 </div>
+
+                {availableSubcategories.length > 0 ? (
+                  <div className="border-t border-[#f2eadc] px-5 py-4">
+                    <label htmlFor="subcategory-filter" className="text-sm font-bold text-[#31291d]">
+                      Subcategory
+                    </label>
+                    <select
+                      id="subcategory-filter"
+                      value={filters.selectedSubcategory}
+                      onChange={(event) => dispatch({ type: "set-subcategory", value: event.target.value })}
+                      className="mt-3 h-10 w-full rounded-xl border border-[#e6dcc9] bg-[#fbf8f2] px-3 text-sm text-[#4b402a]"
+                    >
+                      <option value="all">All subcategories</option>
+                      {availableSubcategories.map((subcategory) => (
+                        <option key={subcategory} value={subcategory}>{subcategory}</option>
+                      ))}
+                    </select>
+                    <label className="mt-4 flex items-center gap-3 text-sm text-[#6e6146]">
+                      <input
+                        type="checkbox"
+                        checked={filters.inStockOnly}
+                        onChange={(event) => dispatch({ type: "set-in-stock", value: event.target.checked })}
+                        className="size-4 accent-[#16834a]"
+                      />
+                      In-stock products only
+                    </label>
+                  </div>
+                ) : null}
 
                 <div className="border-t border-[#f2eadc] px-5 py-4">
                   <h3 className="text-sm font-bold text-[#31291d]">Top Brands</h3>
@@ -896,6 +1052,7 @@ const Home = () => {
                       }
                       className="h-10 w-full min-w-35 appearance-none rounded-xl border border-[#e6dcc9] bg-[#fbf8f2] pl-4 pr-10 text-sm font-medium text-[#4b402a] shadow-sm outline-none transition-colors focus:border-[#c9aa45] focus:ring-1 focus:ring-[#c9aa45]"
                     >
+                      <option value="recommended">Recommended</option>
                       <option value="latest">Newest</option>
                       <option value="price-low">Price: Low to High</option>
                       <option value="price-high">Price: High to Low</option>
@@ -909,11 +1066,19 @@ const Home = () => {
             </motion.div>
 
             {isLoading ? (
-              <motion.div
-                variants={fadeUpVariant}
-                className="rounded-[22px] border border-[#ece4d6] bg-white px-5 py-14 text-center text-[#8c7d60] shadow-[0_8px_24px_rgba(78,62,31,0.05)]"
-              >
-                Loading products...
+              <motion.div variants={fadeUpVariant} aria-label="Loading products" className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {Array.from({ length: 10 }, (_, index) => (
+                  <div key={index} className="rounded-[20px] border border-[#ece4d6] bg-white p-3 shadow-[0_8px_24px_rgba(78,62,31,0.04)]">
+                    <Skeleton className="aspect-square w-full rounded-[16px] bg-[#f1eee7]" />
+                    <Skeleton className="mt-4 h-3 w-2/3 bg-[#eee9df]" />
+                    <Skeleton className="mt-3 h-5 w-full bg-[#eee9df]" />
+                    <Skeleton className="mt-2 h-4 w-1/2 bg-[#eee9df]" />
+                    <div className="mt-5 flex items-center justify-between gap-2">
+                      <Skeleton className="h-7 w-16 bg-[#eee9df]" />
+                      <Skeleton className="h-9 w-20 rounded-xl bg-[#e2eee6]" />
+                    </div>
+                  </div>
+                ))}
               </motion.div>
             ) : paginatedProducts.length > 0 ? (
               <>

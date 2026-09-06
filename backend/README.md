@@ -1,182 +1,56 @@
-# Buy Best Backend API
+# Buy Best Backend
 
-Express + MongoDB backend for the Buy Best grocery storefront, checkout flow, authentication system, and support chat.
+Express 5 and MongoDB API for the Buy Best storefront, authentication, checkout, order management, admin tools, and support chat.
 
-## Stack
+## API Groups
 
-- Node.js
-- Express 5
-- MongoDB with Mongoose
-- Passport Google OAuth
-- JWT + cookie-based auth
-- Nodemailer
-- Cloudinary
-- Socket.IO
-- Stripe
+- `/api/auth` — registration, OTP verification, login, refresh, logout, Google OAuth, password reset, and profile
+- `/api/products` — catalog listing, search, details, and admin product management
+- `/api/catagories` — persisted category management (the legacy spelling is retained for compatibility)
+- `/api/cart` — authenticated add, update, remove, list, and clear operations
+- `/api/addresses` — user-owned delivery-address CRUD
+- `/api/coupons` — persisted promotional data shown on the Offers page and at checkout
+- `/api/payment` — COD checkout, Stripe Checkout, session status, cancellation, and webhook processing
+- `/api/orders` — user order history/detail/cancellation and admin status management
+- `/api/settings` — persisted storefront settings
+- `/api/support` — user tickets and support-agent workflows
 
-## What This Service Handles
+## Safety Properties
 
-- User registration, login, OTP verification, logout, and token refresh
-- Google OAuth login flow
-- Forgot-password and reset-password flows
-- Product catalog APIs and product search
-- Category, coupon, and offer management
-- Cart APIs and checkout preparation
-- Address CRUD for delivery
-- App settings and inventory-related admin data
-- Stripe Checkout session creation and webhook processing
-- Support tickets and real-time support messaging
+- Checkout rebuilds totals from current MongoDB products instead of trusting client or cart snapshot prices.
+- Stock is reserved for created orders and restored if an eligible order is cancelled.
+- Order items retain product snapshots so history remains readable after catalog edits.
+- User order endpoints enforce ownership; admin order updates enforce role and status-transition rules.
+- Address mobile and postal codes are validated before persistence.
+- Stripe completion is based on verified webhook/session state, not a client-side success timer.
 
-## API Mount Points
-
-The server currently mounts these route groups:
-
-- `/api/auth`
-- `/api/products`
-- `/api/cart`
-- `/api/addresses`
-- `/api/catagories`
-- `/api/coupons`
-- `/api/offers`
-- `/api/support`
-- `/api/settings`
-- `/api/payment`
-
-Stripe webhook endpoint:
-
-- `POST /api/payment/webhook`
-
-## Environment Setup
-
-Install dependencies:
+## Setup
 
 ```bash
 npm install
-```
-
-Create the env file:
-
-```bash
 cp .env.example .env
-```
-
-Important variables:
-
-- `PORT`
-- `MONGO_URI`
-- `CORS_ORIGIN`
-- `FRONTEND_URL`
-- `BACKEND_URL`
-- `ACCESS_TOKEN_SECRET`
-- `REFRESH_TOKEN_SECRET`
-- `JWT_SECRET`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `CLIENT_ID`
-- `CLIENT_SECRET`
-- `GOOGLE_CALLBACK_URL`
-- `EMAIL_USER`
-- `EMAIL_CLIENT_ID`
-- `EMAIL_CLIENT_SECRET`
-- `EMAIL_REFRESH_TOKEN`
-- `EMAIL_ACCESS_TOKEN`
-- `CLOUDINARY_CLOUD_NAME`
-- `CLOUDINARY_API_KEY`
-- `CLOUDINARY_API_SECRET`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `OTP_EXPIRY_MINUTES`
-- `RESET_PASSWORD_EXPIRY_MINUTES`
-- `RESET_PASSWORD_URL`
-
-Current deployment example:
-
-```env
-CORS_ORIGIN=https://buy-best-grocery-mern-e-commerce-ap.vercel.app,http://localhost:5173
-FRONTEND_URL=https://buy-best-grocery-mern-e-commerce-ap.vercel.app
-BACKEND_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com
-RESET_PASSWORD_URL=https://buy-best-grocery-mern-e-commerce-ap.vercel.app/reset-password
-GOOGLE_CLIENT_ID=your_google_login_client_id
-GOOGLE_CLIENT_SECRET=your_google_login_client_secret
-GOOGLE_CALLBACK_URL=https://buybest-grocery-mern-e-commerce-app.onrender.com/api/auth/google/callback
-```
-
-Default local API URL:
-
-- `http://localhost:3000`
-
-## Running The Server
-
-Development:
-
-```bash
 npm run dev
 ```
 
-Production:
+Use `.env.example` as the authoritative list of required variable names. Store values only in an ignored `.env` or deployment secret manager.
 
-```bash
-npm start
-```
+## Scripts
 
-## Auth And Sessions
+- `npm run dev` — development server with Node watch mode
+- `npm start` — production server
+- `npm test` — Node test suite, including catalog quality checks
+- `npm run catalog:sync` — dry-run the canonical catalog synchronization
+- `npm run catalog:sync -- --apply` — back up and apply catalog synchronization
+- `npm run check:socket` — support socket diagnostic
+- `npm run check:stripe-webhook` — Stripe webhook diagnostic
+- `npm run check:stripe-flow` — Stripe flow diagnostic
 
-- Browser clients authenticate with cookies and call the refresh endpoint when access tokens expire.
-- In production, the backend requires dedicated `ACCESS_TOKEN_SECRET` and `REFRESH_TOKEN_SECRET` values.
-- Socket.IO connections also rely on the access-token cookie for authentication.
+## External Integrations
 
-## Stripe
+- Google OAuth requires client credentials and the exact deployed callback URL.
+- Email OTP/reset delivery uses the configured Gmail API or mail provider credentials.
+- Cloudinary is used by admin image upload flows.
+- Stripe Checkout requires a secret key and verified webhook secret.
+- Socket.IO shares the API server and authenticates ticket-room access.
 
-Stripe Checkout is used for online payments.
-
-Required variables:
-
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-
-Local webhook forwarding example:
-
-```bash
-stripe listen --forward-to localhost:3000/api/payment/webhook
-```
-
-Copy the `whsec_...` value printed by the Stripe CLI into `STRIPE_WEBHOOK_SECRET`.
-For production, add the deployed backend endpoint in the Stripe dashboard:
-
-```text
-https://your-backend-domain/api/payment/webhook
-```
-
-Webhook events used by the app:
-
-- `checkout.session.completed`
-- `checkout.session.async_payment_succeeded`
-- `checkout.session.async_payment_failed`
-- `checkout.session.expired`
-
-You can verify local config with:
-
-```bash
-npm run check:stripe-webhook
-```
-
-If webhook delivery is missing, payment completion state can drift from the actual Stripe session result.
-
-## Support Chat
-
-- Socket.IO is initialized on the same HTTP server as the REST API.
-- Support agents join a dedicated support room automatically.
-- Ticket rooms are protected so only the ticket owner or a support agent can join and send messages.
-
-## Operational Notes
-
-- `CORS_ORIGIN` accepts a comma-separated list and is parsed into the allowed origin list.
-- On Render free instances, use Gmail API over HTTPS instead of Gmail SMTP.
-  Set `EMAIL_PROVIDER=gmail-api` and keep the existing
-  Google OAuth email env vars: `EMAIL_USER`, `EMAIL_CLIENT_ID`, `EMAIL_CLIENT_SECRET`,
-  and `EMAIL_REFRESH_TOKEN`.
-  Gmail SMTP ports `465`/`587` may be blocked in production even when they work locally.
-- The public route is `/api/catagories` because that is how it is currently implemented in the codebase.
-- `npm test` is still the default placeholder script and does not run an automated backend test suite yet.
-- The seed helper at [src/seed-support.js](/Users/pranshudhiman/Desktop/Intern Ship/NodeJs/E-Commerce/backend/src/seed-support.js) can create or update the local support account.
-- Current production backend URL: `https://buybest-grocery-mern-e-commerce-app.onrender.com`
+Production API: `https://buybest-grocery-mern-e-commerce-app.onrender.com`

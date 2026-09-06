@@ -6,7 +6,6 @@ export type PaymentOption = {
   description: string
   icon: LucideIcon
   tag?: string
-  cashback?: string
 }
 
 export const paymentOptions: PaymentOption[] = [
@@ -15,22 +14,19 @@ export const paymentOptions: PaymentOption[] = [
     label: "Credit Card",
     description: "Pay online using your card",
     icon: CreditCard,
-    tag: "Popular",
-    cashback: "Eligible for select bank cashback offers",
+    tag: "Stripe",
   },
   {
     id: "upi",
     label: "UPI",
     description: "Instant transfer with UPI apps",
     icon: Wallet,
-    tag: "Fastest",
-    cashback: "Best for 1-tap checkout and quick verification",
+    tag: "Stripe",
   },
   {
     id: "cash_on_delivery",
     label: "Cash on Delivery",
     description: "Pay when your order arrives",
     icon: PackageCheck,
-    cashback: "Available on eligible delivery addresses",
   },
 ]

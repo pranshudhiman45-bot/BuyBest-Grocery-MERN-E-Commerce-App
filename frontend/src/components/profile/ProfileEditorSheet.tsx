@@ -104,32 +104,39 @@ export function ProfileEditorSheet({
     }
 
     let isMounted = true
-    setIsLoadingOrders(true)
-    setOrderHistoryError("")
+    const loadOrdersTimeout = window.setTimeout(() => {
+      if (!isMounted) {
+        return
+      }
 
-    void fetchOrderHistory()
-      .then((response) => {
-        if (isMounted) {
-          setOrders(response.orders)
-        }
-      })
-      .catch((historyError) => {
-        if (isMounted) {
-          setOrderHistoryError(
-            historyError instanceof Error
-              ? historyError.message
-              : "Unable to load order history."
-          )
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoadingOrders(false)
-        }
-      })
+      setIsLoadingOrders(true)
+      setOrderHistoryError("")
+
+      void fetchOrderHistory()
+        .then((response) => {
+          if (isMounted) {
+            setOrders(response.orders)
+          }
+        })
+        .catch((historyError) => {
+          if (isMounted) {
+            setOrderHistoryError(
+              historyError instanceof Error
+                ? historyError.message
+                : "Unable to load order history."
+            )
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoadingOrders(false)
+          }
+        })
+    }, 0)
 
     return () => {
       isMounted = false
+      window.clearTimeout(loadOrdersTimeout)
     }
   }, [open])
 
@@ -393,6 +400,10 @@ export function ProfileEditorSheet({
                     <Input
                       id="profile-mobile"
                       type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      maxLength={10}
+                      pattern="[6-9][0-9]{9}"
                       value={mobile}
                       onChange={(event) => setMobile(event.target.value)}
                       className="h-12 rounded-2xl border-[#e6dcc9] bg-[#fbf8f2] text-[#2c2417]"
@@ -486,7 +497,7 @@ export function ProfileEditorSheet({
                               </p>
                             </div>
                             <span className="shrink-0 rounded-full bg-[#f4fbf6] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#1B4D3E]">
-                              {formatOrderStatus(order.paymentStatus)}
+                              {formatOrderStatus(order.orderStatus || order.paymentStatus)}
                             </span>
                           </div>
                           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#7d6d52]">

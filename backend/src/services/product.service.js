@@ -87,6 +87,7 @@ const buildProductPayload = (input = {}, existingProduct = null) => {
     brand: String(input.brand || '').trim(),
     category: slugify(categorySource),
     categoryLabel: String(input.categoryLabel || input.category || existingProduct?.categoryLabel || '').trim(),
+    subcategory: String(input.subcategory || existingProduct?.subcategory || '').trim(),
     size: String(input.size || '').trim(),
     price: Number(input.price) || 0,
     originalPrice:
@@ -117,6 +118,10 @@ const buildProductPayload = (input = {}, existingProduct = null) => {
       input.isNewArrival === undefined
         ? Boolean(existingProduct?.isNewArrival)
         : Boolean(input.isNewArrival),
+    featured:
+      input.featured === undefined
+        ? Boolean(existingProduct?.featured)
+        : Boolean(input.featured),
     publish: input.publish === undefined ? true : Boolean(input.publish)
   }
 }
@@ -135,6 +140,7 @@ const mapProductToStorefront = (productDocument) => {
     brand: product.brand,
     category: slugify(product.category || product.categoryLabel),
     categoryLabel: product.categoryLabel || product.category,
+    subcategory: product.subcategory || '',
     size: product.size,
     price: product.price,
     originalPrice: product.originalPrice || undefined,
@@ -156,7 +162,10 @@ const mapProductToStorefront = (productDocument) => {
     gallery,
     relatedIds: product.relatedIds || [],
     isBestSeller: Boolean(product.isBestSeller),
-    isNewArrival: Boolean(product.isNewArrival)
+    isNewArrival: Boolean(product.isNewArrival),
+    featured: Boolean(product.featured),
+    createdAt: product.createdAt || null,
+    updatedAt: product.updatedAt || null
   }
 }
 

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AdminOrders } from "@/components/admin/AdminOrders";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -64,6 +65,7 @@ const emptyForm: ProductFormData = {
   brand: "",
   category: "",
   categoryLabel: "",
+  subcategory: "",
   size: "",
   price: 0,
   originalPrice: null,
@@ -79,7 +81,7 @@ const emptyForm: ProductFormData = {
   storage: "",
   tags: "",
   relatedIds: "",
-  isBestSeller: false,
+  featured: false,
   isNewArrival: false,
   publish: true,
 };
@@ -116,6 +118,7 @@ const createFormFromProduct = (product: Product): ProductFormData => ({
   brand: product.brand,
   category: product.category,
   categoryLabel: product.categoryLabel,
+  subcategory: product.subcategory || "",
   size: product.size,
   price: product.price,
   originalPrice: product.originalPrice ?? null,
@@ -131,7 +134,7 @@ const createFormFromProduct = (product: Product): ProductFormData => ({
   storage: product.storage || "",
   tags: toTextValue(product.tags),
   relatedIds: toTextValue(product.relatedIds),
-  isBestSeller: Boolean(product.isBestSeller),
+  featured: Boolean(product.featured),
   isNewArrival: Boolean(product.isNewArrival),
   publish: true,
 });
@@ -146,7 +149,6 @@ type ProductSortKey =
 
 type ProductFeatureFilter =
   | "all"
-  | "bestseller"
   | "new_arrival"
   | "featured"
   | "regular";
@@ -294,6 +296,7 @@ export default function AdminPanel() {
             ...product,
             isBestSeller: Boolean(product.isBestSeller),
             isNewArrival: Boolean(product.isNewArrival),
+            featured: Boolean(product.featured),
           })),
         );
       }
@@ -347,7 +350,11 @@ export default function AdminPanel() {
   }, []);
 
   React.useEffect(() => {
-    void loadAdminData();
+    const loadTimeout = window.setTimeout(() => {
+      void loadAdminData();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimeout);
   }, [loadAdminData]);
 
   const categoryOptions = React.useMemo(
@@ -362,7 +369,7 @@ export default function AdminPanel() {
   const productStats = React.useMemo(
     () => ({
       total: products.length,
-      bestSellers: products.filter((product) => Boolean(product.isBestSeller))
+      featured: products.filter((product) => Boolean(product.featured))
         .length,
       newArrivals: products.filter((product) => Boolean(product.isNewArrival))
         .length,
@@ -389,14 +396,12 @@ export default function AdminPanel() {
 
       const matchesFeature =
         productFeatureFilter === "all" ||
-        (productFeatureFilter === "bestseller" &&
-          Boolean(product.isBestSeller)) ||
         (productFeatureFilter === "new_arrival" &&
           Boolean(product.isNewArrival)) ||
         (productFeatureFilter === "featured" &&
-          (Boolean(product.isBestSeller) || Boolean(product.isNewArrival))) ||
+          Boolean(product.featured)) ||
         (productFeatureFilter === "regular" &&
-          !product.isBestSeller &&
+          !product.featured &&
           !product.isNewArrival);
 
       const matchesStock =
@@ -895,14 +900,14 @@ export default function AdminPanel() {
                 className="min-w-[140px] snap-start rounded-[20px] bg-white/12 px-4 py-3 hover:bg-white/20 transition 2xl:min-w-0 cursor-pointer"
                 onClick={() => {
                   setShowProducts(true);
-                  setProductFeatureFilter("bestseller");
+                  setProductFeatureFilter("featured");
                 }}
               >
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                  Bestsellers
+                  Featured
                 </div>
                 <div className="mt-1 text-2xl font-black">
-                  {productStats.bestSellers}
+                  {productStats.featured}
                 </div>
               </div>
               <div
@@ -923,6 +928,8 @@ export default function AdminPanel() {
           </div>
         </CardHeader>
       </Card>
+
+      <AdminOrders />
 
       {message || error ? (
         <div className="pointer-events-none fixed right-4 top-4 z-50 w-[calc(100vw-2rem)] max-w-md sm:right-6 sm:top-6">
@@ -1176,16 +1183,6 @@ export default function AdminPanel() {
                   {showCouponForm ? "Hide" : "Show"}
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setMessage("Bank offers section coming next.");
-                  }}
-                  className="rounded-2xl border-[#dbeadf] hover:bg-[#f0f7f3]"
-                >
-                  Bank Offers
-                </Button>
               </div>
             </div>
           </CardHeader>
@@ -1546,6 +1543,15 @@ export default function AdminPanel() {
                       />
                     </Field>
                     <Field>
+                      <FieldLabel htmlFor="subcategory">Subcategory</FieldLabel>
+                      <Input
+                        id="subcategory"
+                        value={String(form.subcategory || "")}
+                        onChange={updateField("subcategory")}
+                        placeholder="e.g. Milk or Fresh Fruits"
+                      />
+                    </Field>
+                    <Field>
                       <FieldLabel htmlFor="price">Price</FieldLabel>
                       <Input
                         id="price"
@@ -1645,18 +1651,18 @@ export default function AdminPanel() {
                     <Field>
                       <label className="flex items-center gap-3 rounded-[18px] border border-[#dbeadf] bg-[#f7fbf8] px-4 py-3 text-sm font-medium text-[#184236]">
                         <Input
-                          id="isBestSeller"
+                          id="featured"
                           type="checkbox"
-                          checked={Boolean(form.isBestSeller)}
+                          checked={Boolean(form.featured)}
                           onChange={(event) =>
                             setForm((current) => ({
                               ...current,
-                              isBestSeller: event.target.checked,
+                              featured: event.target.checked,
                             }))
                           }
                           className="h-4 w-4"
                         />
-                        Add this product to the bestseller section
+                        Feature this product on the storefront
                       </label>
                     </Field>
                     <Field>
@@ -1959,9 +1965,8 @@ export default function AdminPanel() {
                         className="flex h-11 w-full items-center justify-between rounded-xl border border-[#dbeadf] bg-white px-3 py-2 text-sm font-medium text-[#184236] shadow-sm transition hover:border-[#0d7a45] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#0d7a45]/20"
                       >
                         <option value="all">All feature states</option>
-                        <option value="bestseller">Bestsellers</option>
                         <option value="new_arrival">New arrivals</option>
-                        <option value="featured">Any featured product</option>
+                        <option value="featured">Featured products</option>
                         <option value="regular">Regular products</option>
                       </select>
                       <select
@@ -2107,9 +2112,9 @@ export default function AdminPanel() {
                                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#789286]">
                                     {product.brand || product.categoryLabel}
                                   </p>
-                                  {product.isBestSeller ? (
+                                  {product.featured ? (
                                     <ProductBadge
-                                      label="Bestseller"
+                                      label="Featured"
                                       tone="green"
                                     />
                                   ) : null}
@@ -2335,7 +2340,7 @@ export default function AdminPanel() {
                     Featured
                   </p>
                   <p className="mt-1 text-lg font-semibold text-[#24421a]">
-                    {productStats.bestSellers + productStats.newArrivals}{" "}
+                    {productStats.featured + productStats.newArrivals}{" "}
                     home-page products
                   </p>
                 </div>
@@ -2371,20 +2376,6 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Bank Offers Section */}
-      <Card className="rounded-[28px] border border-white/70 bg-white/92 py-0 shadow-[0_18px_44px_rgba(18,75,53,0.08)] mt-6">
-        <CardHeader className="px-6 pt-6">
-          <CardTitle>Bank Offers</CardTitle>
-          <CardDescription>
-            Manage bank-specific offers like credit/debit card discounts.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-6 pb-6 space-y-3">
-          <div className="rounded-[18px] border border-dashed border-[#dbeadf] px-4 py-5 text-sm text-[#648176]">
-            Bank offers creation UI coming next 🚀
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

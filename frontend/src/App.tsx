@@ -33,6 +33,8 @@ const Offer = React.lazy(() => import("@/pages/Offer"))
 const ProductDetails = React.lazy(() => import("@/pages/ProductDetails"))
 const CartPage = React.lazy(() => import("@/pages/CartPage"))
 const CheckoutPage = React.lazy(() => import("@/pages/CheckoutPage"))
+const AccountPage = React.lazy(() => import("@/pages/AccountPage"))
+const OrdersPage = React.lazy(() => import("@/pages/OrdersPage"))
 const AdminPanel = React.lazy(() => import("@/pages/AdminPanel"))
 const UserSupport = React.lazy(() => import("@/pages/UserSupport"))
 const SupportPanel = React.lazy(() => import("@/pages/SupportPanel"))
@@ -44,7 +46,7 @@ const getPageMetadata = (activeView: string) => {
       return {
         title: "About Buy Best",
         description:
-          "Learn more about Buy Best and our fresh grocery delivery experience.",
+          "Learn more about the Buy Best grocery shopping experience.",
       }
     case "offers":
       return {
@@ -56,7 +58,7 @@ const getPageMetadata = (activeView: string) => {
       return {
         title: "Product Details",
         description:
-          "View pricing, freshness details, and product information before adding to cart.",
+          "View current pricing, stock, unit size, and product information before adding to cart.",
       }
     case "cart":
       return {
@@ -69,6 +71,17 @@ const getPageMetadata = (activeView: string) => {
         title: "Checkout",
         description:
           "Complete your grocery order with payment, coupons, and final confirmation.",
+      }
+    case "account":
+      return {
+        title: "Your Account",
+        description: "Manage your Buy Best profile, saved addresses, and order history.",
+      }
+    case "orders":
+    case "order":
+      return {
+        title: "Your Orders",
+        description: "View your saved Buy Best orders and their current status.",
       }
     case "admin":
       return {
@@ -105,7 +118,7 @@ const getPageMetadata = (activeView: string) => {
       return {
         title: "Fresh Grocery Delivery",
         description:
-          "Shop fresh groceries, daily essentials, and fast delivery with Buy Best.",
+          "Shop groceries and daily essentials with Buy Best.",
       }
   }
 }
@@ -115,6 +128,7 @@ const App = () => {
   const activeView = useAppShellSelector((state) => state.activeView)
   const selectedCategory = useAppShellSelector((state) => state.selectedCategory)
   const selectedProductId = useAppShellSelector((state) => state.selectedProductId)
+  const selectedOrderId = useAppShellSelector((state) => state.selectedOrderId)
   const loginMessage = useAppShellSelector((state) => state.loginMessage)
   const loginError = useAppShellSelector((state) => state.loginError)
   const loginRedirectView = useAppShellSelector((state) => state.loginRedirectView)
@@ -259,6 +273,7 @@ const App = () => {
       activeView,
       previousView: activeView,
       selectedProductId,
+      selectedOrderId,
       selectedCategory,
       loginMessage,
       loginError,
@@ -293,6 +308,7 @@ const App = () => {
     resetPasswordToken,
     selectedCategory,
     selectedProductId,
+    selectedOrderId,
   ])
 
   const handleAuthenticated = React.useCallback(
@@ -366,6 +382,20 @@ const App = () => {
           {activeView === "cart" ? <CartPage currentUser={currentUser} /> : null}
           {activeView === "checkout" ? (
             <CheckoutPage currentUser={currentUser} />
+          ) : null}
+          {activeView === "account" ? (
+            <AccountPage
+              currentUser={currentUser}
+              onUserUpdate={handleUserUpdate}
+              onLogout={handleLogout}
+              isLoggingOut={isLoggingOut}
+            />
+          ) : null}
+          {activeView === "orders" || activeView === "order" ? (
+            <OrdersPage
+              currentUser={currentUser}
+              selectedOrderId={activeView === "order" ? selectedOrderId : null}
+            />
           ) : null}
           {activeView === "admin" ? (
             currentUser?.role === "admin" ? (

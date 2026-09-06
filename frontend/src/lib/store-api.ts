@@ -41,6 +41,7 @@ export type CartResponse = {
 
 export type CheckoutResponse = {
   message: string
+  orderId?: string
   paymentMethod: string
   address?: Address | null
   summary: CartSummary
@@ -54,11 +55,27 @@ export type StripeCheckoutSessionResponse = {
   url: string | null
 }
 
+export type StripeCheckoutOrder = {
+  orderId?: string
+  productDetails?: {
+    name?: string | null
+  }
+  quantity: number
+  total?: number
+  subToatl?: number
+  items?: Array<{
+    name?: string | null
+    quantity: number
+    unitPrice?: number
+    lineTotal?: number
+  }>
+}
+
 export type StripeCheckoutStatusResponse = {
   sessionId: string
   status: string
   paymentStatus: string
-  orders?: any[]
+  orders?: StripeCheckoutOrder[]
 }
 
 export type Address = {
@@ -97,6 +114,7 @@ export type ProductFormData = {
   brand: string
   category: string
   categoryLabel: string
+  subcategory?: string
   size: string
   price: number
   originalPrice?: number | null
@@ -114,6 +132,7 @@ export type ProductFormData = {
   relatedIds?: string[] | string
   isBestSeller?: boolean
   isNewArrival?: boolean
+  featured?: boolean
   publish?: boolean
 }
 
@@ -143,14 +162,49 @@ export type InventoryAlertsResponse = {
   }
 }
 
-export type BankOffer = {
-  id: number
-  bank: string
-  offer: string
-}
-
 export type AppSettings = {
   taxPercentage: number
+}
+
+export type StoreOrderItem = {
+  productId: string | null
+  name: string
+  brand: string
+  size: string
+  image?: string | null
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export type StoreOrder = {
+  id: string
+  orderId: string
+  items: StoreOrderItem[]
+  subtotal: number
+  discount: number
+  deliveryFee: number
+  tax: number
+  total: number
+  couponCode?: string | null
+  paymentMethod?: string | null
+  paymentStatus: string
+  orderStatus: "placed" | "confirmed" | "packed" | "out_for_delivery" | "delivered" | "cancelled"
+  deliveryAddress?: {
+    addressLine?: string
+    street?: string
+    city?: string
+    state?: string
+    postalCode?: string
+    mobile?: string
+  } | null
+  customer?: {
+    id: string
+    name: string
+    email: string
+  }
+  createdAt?: string
+  updatedAt?: string
 }
 
 const normalizeInventoryAlertsResponse = (
@@ -427,6 +481,15 @@ export async function removeCartItem(productId: string) {
   }
 }
 
+export async function clearCart() {
+  try {
+    const response = await storeApi.delete<CartResponse>("/api/cart")
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to clear cart."))
+  }
+}
+
 const buildIdempotencyConfig = (idempotencyKey?: string) =>
   idempotencyKey
     ? {
@@ -487,6 +550,17 @@ export async function fetchStripeCheckoutStatus(sessionId: string) {
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to verify Stripe payment status."))
+  }
+}
+
+export async function cancelStripeCheckoutSession(sessionId: string) {
+  try {
+    const response = await storeApi.post<{ message: string }>(
+      `/api/payment/cancel-session/${sessionId}`
+    )
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to record cancelled checkout."))
   }
 }
 
@@ -614,15 +688,6 @@ export async function fetchInventoryAlerts() {
   }
 }
 
-export async function fetchBankOffers() {
-  try {
-    const response = await storeApi.get<{ offers: BankOffer[] }>("/api/offers/banks")
-    return response.data.offers
-  } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to load bank offers."))
-  }
-}
-
 export async function fetchAppSettings() {
   try {
     const response = await storeApi.get<AppSettings>("/api/settings")
@@ -641,5 +706,60 @@ export async function updateAppSettings(payload: AppSettings) {
     return response.data
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to update app settings."))
+  }
+}
+
+export async function fetchOrders() {
+  try {
+    const response = await storeApi.get<{ orders: StoreOrder[] }>("/api/orders")
+    return response.data.orders
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load orders."))
+  }
+}
+
+export async function fetchOrder(orderId: string) {
+  try {
+    const response = await storeApi.get<{ order: StoreOrder }>(`/api/orders/${orderId}`)
+    return response.data.order
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load this order."))
+  }
+}
+
+export async function cancelOrder(orderId: string) {
+  try {
+    const response = await storeApi.patch<{ message: string; order: StoreOrder }>(
+      `/api/orders/${orderId}/cancel`
+    )
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to cancel this order."))
+  }
+}
+
+export async function fetchAdminOrders(status?: string) {
+  try {
+    const response = await storeApi.get<{ orders: StoreOrder[] }>("/api/orders/admin", {
+      params: status ? { status } : undefined,
+    })
+    return response.data.orders
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load admin orders."))
+  }
+}
+
+export async function updateAdminOrderStatus(
+  orderId: string,
+  orderStatus: StoreOrder["orderStatus"]
+) {
+  try {
+    const response = await storeApi.patch<{ message: string; order: StoreOrder }>(
+      `/api/orders/admin/${orderId}/status`,
+      { orderStatus }
+    )
+    return response.data
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to update order status."))
   }
 }

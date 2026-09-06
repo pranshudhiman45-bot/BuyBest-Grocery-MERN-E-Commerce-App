@@ -11,6 +11,7 @@ router.get('/count', cartController.getCartCount)
 router.post('/items', cartController.addCartItem)
 router.patch('/items/:productId', cartController.updateCartItem)
 router.delete('/items/:productId', cartController.removeCartItem)
+router.delete('/', cartController.clearCart)
 router.post('/checkout', cartController.checkoutCart)
 
 module.exports = router

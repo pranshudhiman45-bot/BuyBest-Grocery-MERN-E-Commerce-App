@@ -6,7 +6,7 @@ import {
   getCouponRequirementLabel,
   type CouponDefinition,
 } from "@/lib/offers"
-import { fetchBankOffers, fetchCoupons } from "@/lib/store-api"
+import { fetchCoupons } from "@/lib/store-api"
 
 const Offer = () => {
   const [copied, setCopied] = useState<string | null>(null)
@@ -15,10 +15,7 @@ const Offer = () => {
   useEffect(() => {
     const loadOfferData = async () => {
       try {
-        const [nextCoupons] = await Promise.all([
-          fetchCoupons(),
-          fetchBankOffers(),
-        ])
+        const nextCoupons = await fetchCoupons()
         setCoupons(nextCoupons)
       } catch {
         setCoupons([])

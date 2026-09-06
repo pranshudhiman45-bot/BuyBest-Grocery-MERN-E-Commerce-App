@@ -67,6 +67,7 @@ export type OrderHistoryItem = {
   total: number
   paymentMethod?: string | null
   paymentStatus?: string | null
+  orderStatus?: string | null
   couponCode?: string | null
   createdAt?: string
   deliveryAddress?: {

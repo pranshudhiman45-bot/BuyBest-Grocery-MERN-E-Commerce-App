@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 import {
   ArrowLeft,
-  Clock,
   CheckCircle2,
   CreditCard,
-  Package,
   ShoppingCart,
   TriangleAlert,
-  Truck,
   X,
 } from "lucide-react"
 
@@ -24,8 +21,8 @@ import {
   isCouponEligible,
   type CouponDefinition,
 } from "@/lib/offers"
-import { getApiUrl } from "@/lib/api-config"
 import {
+  cancelStripeCheckoutSession,
   createStripeCheckoutSession,
   fetchCoupons,
   fetchStripeCheckoutStatus,
@@ -38,16 +35,15 @@ type CheckoutPageProps = {
 }
 
 type PlacedOrderDetails = {
-  items: { name: string; quantity: number; price: number; totalPrice?: number }[]
+  items: { name: string; quantity: number; lineTotal: number }[]
   total: number
-  placedAt: number
+  orderId?: string
 }
 
 const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
   const dispatch = useAppShellDispatch()
   const [isLoginAlertOpen, setIsLoginAlertOpen] = useState(false)
   const [placedOrderDetails, setPlacedOrderDetails] = useState<PlacedOrderDetails | null>(null)
-  const [deliveryStatus, setDeliveryStatus] = useState("processing")
   const [couponCode, setCouponCode] = useState("")
   const [couponFeedback, setCouponFeedback] = useState("")
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null)
@@ -92,7 +88,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
       return false
     },
     getSuccessMessage: (response) => {
-      const payableLabel = formatPrice(payableTotal)
+      const payableLabel = formatPrice(response.summary.total)
 
       if (appliedCoupon) {
         return `${response.message} Coupon ${appliedCoupon.code} applied. Total payable: ${payableLabel}`
@@ -102,9 +98,13 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
     },
     onCheckoutSuccess: (response) => {
       setPlacedOrderDetails({
-        items: response.items || [],
+        items: (response.items || []).map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          lineTotal: item.totalPrice,
+        })),
         total: response.summary?.total || 0,
-        placedAt: Date.now()
+        orderId: response.orderId,
       })
     }
   })
@@ -118,12 +118,8 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
       setCheckoutMessage("Stripe checkout was cancelled. Your cart is still waiting for you.")
       
       if (sessionId) {
-        import("axios").then((axios) => {
-          axios.default.post(
-            getApiUrl(`/api/payment/cancel-session/${sessionId}`),
-            {},
-            { withCredentials: true }
-          ).catch(console.error)
+        void cancelStripeCheckoutSession(sessionId).catch(() => {
+          // Checkout remains in the cart even if status cleanup cannot be reached.
         })
       }
 
@@ -162,14 +158,21 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
           setCheckoutMessage("Payment confirmed and your order has been placed successfully.")
           
           if (latestStatus.orders && latestStatus.orders.length > 0) {
+            const storedOrder = latestStatus.orders[0]
             setPlacedOrderDetails({
-              items: latestStatus.orders.map(o => ({
-                name: o.productDetails?.name || "Product",
-                quantity: o.quantity,
-                price: o.total || o.subToatl || 0
-              })),
-              total: latestStatus.orders.reduce((acc, o) => acc + (o.total || o.subToatl || 0), 0),
-              placedAt: Date.now()
+              items: storedOrder.items?.length
+                ? storedOrder.items.map((item) => ({
+                    name: item.name || "Product",
+                    quantity: item.quantity,
+                    lineTotal: item.lineTotal || (item.unitPrice || 0) * item.quantity,
+                  }))
+                : latestStatus.orders.map((order) => ({
+                    name: order.productDetails?.name || "Product",
+                    quantity: order.quantity,
+                    lineTotal: order.total || order.subToatl || 0,
+                  })),
+              total: latestStatus.orders.reduce((total, order) => total + (order.total || order.subToatl || 0), 0),
+              orderId: storedOrder.orderId,
             })
           }
         } else {
@@ -188,23 +191,6 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
 
     void verifyStripeCheckout()
   }, [clearCartState, currentUser, refreshCart, setCheckoutMessage])
-
-  useEffect(() => {
-    if (!placedOrderDetails) return
-    
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - placedOrderDetails.placedAt
-      if (elapsed > 10 * 60 * 1000) {
-        setDeliveryStatus("delivered")
-      } else if (elapsed > 2 * 60 * 1000) {
-        setDeliveryStatus("on_the_way")
-      } else {
-        setDeliveryStatus("processing")
-      }
-    }, 1000)
-    
-    return () => clearInterval(interval)
-  }, [placedOrderDetails])
 
   useEffect(() => {
     const loadCoupons = async () => {
@@ -330,51 +316,17 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#dcfce7] text-[#166534]">
             <CheckCircle2 className="h-8 w-8" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-[#123c31] sm:text-3xl">Order Confirmed!</h1>
+          <h1 className="mt-4 text-2xl font-bold text-[#123c31] sm:text-3xl">Order placed</h1>
           <p className="mt-2 text-[#648176]">{checkoutMessage}</p>
         </div>
 
-          <div className="mt-10 rounded-2xl border border-[#e2e8f0] bg-white p-6">
-            <h2 className="text-lg font-semibold text-[#1e293b]">Delivery Status</h2>
-            <div className="mt-6 relative">
-              <div className="absolute left-0 top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-[#f1f5f9]"></div>
-              <div 
-                className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#10b981] transition-all duration-1000"
-                style={{ 
-                  width: deliveryStatus === 'delivered' ? '100%' : deliveryStatus === 'on_the_way' ? '50%' : '0%' 
-                }}
-              ></div>
-              
-              <div className="relative flex justify-between">
-                <div className="flex flex-col items-center gap-2 bg-white px-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${deliveryStatus === 'processing' || deliveryStatus === 'on_the_way' || deliveryStatus === 'delivered' ? 'bg-[#10b981] text-white' : 'bg-[#e2e8f0] text-[#94a3b8]'}`}>
-                    <Package className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-[#334155]">Processing</span>
-                </div>
-                <div className="flex flex-col items-center gap-2 bg-white px-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${deliveryStatus === 'on_the_way' || deliveryStatus === 'delivered' ? 'bg-[#10b981] text-white' : 'bg-[#e2e8f0] text-[#94a3b8]'}`}>
-                    <Truck className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-[#334155]">On the Way</span>
-                </div>
-                <div className="flex flex-col items-center gap-2 bg-white px-2">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full ${deliveryStatus === 'delivered' ? 'bg-[#10b981] text-white' : 'bg-[#e2e8f0] text-[#94a3b8]'}`}>
-                    <CheckCircle2 className="h-5 w-5" />
-                  </div>
-                  <span className="text-sm font-medium text-[#334155]">Delivered</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-8 flex items-center justify-center gap-2 rounded-lg bg-[#f8fafc] p-3 text-[#475569]">
-              <Clock className="h-5 w-5 text-[#3b82f6]" />
-              <span className="text-sm font-medium">
-                {deliveryStatus === 'delivered' 
-                  ? "Your order has been delivered successfully!" 
-                  : "Estimated delivery in 10-15 minutes."}
-              </span>
-            </div>
+          <div className="mt-8 rounded-2xl border border-[#dce9e2] bg-[#f7fbf8] p-5 text-center">
+            <p className="text-sm font-semibold text-[#174638]">
+              {placedOrderDetails.orderId
+                ? `Order ${placedOrderDetails.orderId} is saved.`
+                : "Your order is saved to your account."}
+            </p>
+            <p className="mt-1 text-sm text-[#648176]">Delivery progress will only change when the stored order status is updated.</p>
           </div>
 
           <div className="mt-8 rounded-2xl border border-[#e2e8f0] bg-white p-6">
@@ -383,17 +335,27 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
               {placedOrderDetails.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between py-3 text-sm">
                   <span className="text-[#475569]">{item.name} <span className="text-[#94a3b8]">x{item.quantity}</span></span>
-                  <span className="font-medium text-[#1e293b]">{formatPrice(item.price || item.totalPrice || 0)}</span>
+                  <span className="font-medium text-[#1e293b]">{formatPrice(item.lineTotal)}</span>
                 </div>
               ))}
             </div>
             <div className="mt-4 flex justify-between border-t border-[#e2e8f0] pt-4 font-semibold">
-              <span className="text-[#1e293b]">Total Paid</span>
+              <span className="text-[#1e293b]">Order total</span>
               <span className="text-[#16a34a]">{formatPrice(placedOrderDetails.total)}</span>
             </div>
           </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 flex flex-wrap justify-center gap-3 text-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-2xl"
+              onClick={() => placedOrderDetails.orderId
+                ? dispatch(appShellActions.openOrder(placedOrderDetails.orderId))
+                : dispatch(appShellActions.openOrders())}
+            >
+              View order status
+            </Button>
             <Button
               type="button"
               className="rounded-2xl bg-[#0d7a45] hover:bg-[#0a6539]"
@@ -459,14 +421,20 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
 
                 <div className="mt-6 max-w-2xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[#6f8d80]">
-                    Dedicated checkout
+                    Checkout · Step 3 of 4
                   </p>
                   <h1 className="mt-3 text-4xl font-semibold leading-[0.96] text-[#11392f] sm:text-5xl">
-                    Payment and coupons, section.
+                    Review payment and place your order.
                   </h1>
                   <p className="mt-4 max-w-xl text-sm leading-7 text-[#658177] sm:text-base">
-                    This screen is focused only on payment method, coupon selection, and final order confirmation. Cart items stay back on the bag page.
+                    Your cart and delivery address are ready. Choose a payment method, apply an eligible coupon, and review the final total before placing the order.
                   </p>
+                  <ol className="mt-5 flex flex-wrap gap-2 text-xs font-semibold" aria-label="Checkout progress">
+                    <li className="rounded-full bg-[#e7f4eb] px-3 py-2 text-[#176942]">1 Cart ✓</li>
+                    <li className="rounded-full bg-[#e7f4eb] px-3 py-2 text-[#176942]">2 Address ✓</li>
+                    <li className="rounded-full bg-[#123c31] px-3 py-2 text-white">3 Payment</li>
+                    <li className="rounded-full border border-[#dce9e2] bg-white px-3 py-2 text-[#6a8579]">4 Confirmation</li>
+                  </ol>
                 </div>
               </div>
 
@@ -482,8 +450,8 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
                 </div>
                 <div className="rounded-[24px] border border-[#dce9e2] bg-white/80 p-4 shadow-sm">
                   <CreditCard className="h-5 w-5 text-[#0d7a45]" />
-                  <p className="mt-3 text-sm font-semibold text-[#123b30]">Focused checkout flow</p>
-                  <p className="mt-1 text-sm text-[#6a8579]">No cart clutter here, just payment, coupons, and confirmation.</p>
+                  <p className="mt-3 text-sm font-semibold text-[#123b30]">Payment status stays honest</p>
+                  <p className="mt-1 text-sm text-[#6a8579]">COD remains payable on delivery. Online payment is confirmed only after Stripe reports it as paid.</p>
                 </div>
               </div>
             </div>
@@ -518,7 +486,7 @@ const CheckoutPage = ({ currentUser = null }: CheckoutPageProps) => {
                 appliedCouponCode={appliedCoupon?.code}
                 couponDiscount={couponDiscount}
                 payableTotal={payableTotal}
-                checkoutLabel="Place Order"
+                checkoutLabel={selectedPaymentMethod === "cash_on_delivery" ? "Place COD order" : "Continue to Stripe"}
                 showItemDetails={false}
                 onCheckout={() => handleCheckout(appliedCoupon?.code)}
               />

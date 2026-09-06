@@ -77,6 +77,8 @@ module.exports = {
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  supportEmail: process.env.SUPPORT_EMAIL,
+  supportPassword: process.env.SUPPORT_PASSWORD,
   googleCallbackUrl:
     process.env.GOOGLE_CALLBACK_URL ||
     `${backendUrl.replace(/\/$/, '')}/api/auth/google/callback`,

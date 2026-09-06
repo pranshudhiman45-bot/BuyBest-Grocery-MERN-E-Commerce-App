@@ -29,12 +29,14 @@ const addressSchema = new mongoose.Schema(
     postalCode: {
       type: String,
       default: null,
-      required: [true, 'Please provide postal code']
+      required: [true, 'Please provide postal code'],
+      match: [/^[1-9][0-9]{5}$/, 'Please provide a valid 6-digit Indian postal code']
     },
     mobile: {
-      type: Number,
+      type: String,
       default: null,
-      required: [true, 'Please provide mobile number']
+      required: [true, 'Please provide mobile number'],
+      match: [/^[6-9][0-9]{9}$/, 'Please provide a valid 10-digit Indian mobile number']
     },
     country: {
       default: null,

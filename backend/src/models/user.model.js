@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Please provide email'],
       unique: [true, 'Email already exists'],
       match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+        /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
         'Please provide a valid email'
       ],
       lowercase: true,
@@ -49,8 +49,9 @@ const userSchema = new mongoose.Schema(
       default: null
     },
     mobile: {
-      type: Number,
-      default: null
+      type: String,
+      default: null,
+      match: [/^[6-9][0-9]{9}$/, 'Please provide a valid 10-digit Indian mobile number']
     },
     role: {
       type: String,

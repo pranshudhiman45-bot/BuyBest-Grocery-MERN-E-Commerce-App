@@ -89,11 +89,6 @@ export function PaymentMethodSelector({
                 <div className="mt-1 flex flex-col gap-0.5 text-sm leading-5 text-[#6c867b]">
                   <span>{option.description}</span>
 
-                  {option.cashback ? (
-                    <span className="text-xs font-semibold text-green-700">
-                      {option.cashback}
-                    </span>
-                  ) : null}
                 </div>
               </div>
             </button>

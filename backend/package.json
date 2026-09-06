@@ -4,9 +4,11 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "catalog:sync": "node scripts/sync-catalog.js",
+    "check:cod-flow": "node scripts/check-shopper-flow.js",
     "check:socket": "node scripts/check-socket.js",
     "check:stripe-webhook": "node scripts/check-stripe-webhook.js",
     "check:stripe-flow": "node scripts/check-stripe-flow.js"

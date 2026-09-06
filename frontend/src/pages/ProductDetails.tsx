@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import {
   ArrowLeft,
   Check,
-  Clock3,
   Minus,
+  PackageCheck,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -211,23 +211,22 @@ const ProductDetails = () => {
   ].filter(Boolean) as string[]
   const featureCards = [
     {
-      title: "Freshness promise",
-      description: "Packed with quality checks before dispatch for a dependable everyday order.",
+      title: "Current availability",
+      description: `${availableStock} unit${availableStock === 1 ? "" : "s"} currently recorded in stock.`,
       icon: ShieldCheck,
       tone: "bg-[#eef8ec] text-[#184b35]",
     },
     {
-      title: "Quick doorstep delivery",
-      description: "Optimized for fast local fulfilment so essentials reach you right on time.",
-      icon: Clock3,
+      title: "Purchase limit",
+      description: maxPerOrder ? `Up to ${maxPerOrder} units per order.` : "Limited by current stock availability.",
+      icon: PackageCheck,
       tone: "bg-[#eef5ff] text-[#1c4f73]",
     },
     {
-      title: "Why you'll like it",
+      title: "Product information",
       description:
-        product.benefits?.[0] ||
         product.description ||
-        "A reliable grocery staple chosen for freshness, convenience, and everyday value.",
+        "See the product pack for complete ingredients and usage information.",
       icon: Sparkles,
       tone: "bg-[#fff5e7] text-[#7a4e16]",
     },
@@ -368,9 +367,9 @@ const ProductDetails = () => {
                 <span className="rounded-full bg-[#f3efe4] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b6b4c]">
                   {product.brand || product.categoryLabel}
                 </span>
-                {product.isBestSeller ? (
+                {product.featured ? (
                   <span className="rounded-full bg-[#ffe7a6] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6a4a00]">
-                    Best Seller
+                    Featured
                   </span>
                 ) : null}
                 {product.isNewArrival ? (
@@ -414,22 +413,22 @@ const ProductDetails = () => {
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[20px] border border-[#e8efe9] bg-[linear-gradient(135deg,#f7fcf8_0%,#eef8f1_100%)] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7b9588]">
-                    Estimated arrival
+                    Availability
                   </p>
                   <div className="mt-2.5 flex items-center gap-3 text-lg font-semibold text-[#123f33]">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#1b9858] shadow-sm">
-                      <Clock3 className="size-4" />
+                      <PackageCheck className="size-4" />
                     </span>
-                    10 - 16 mins
+                    {isOutOfStock ? "Out of stock" : `${availableStock} in stock`}
                   </div>
                 </div>
 
                 <div className="rounded-[20px] border border-[#eee3d2] bg-[linear-gradient(135deg,#fffaf3_0%,#f7f1e4_100%)] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#9a8765]">
-                    Product promise
+                    Subcategory
                   </p>
                   <div className="mt-2.5 text-lg font-semibold leading-snug text-[#2f3f35]">
-                    Freshly packed and quality checked
+                    {product.subcategory || product.categoryLabel}
                   </div>
                 </div>
               </div>
@@ -516,7 +515,7 @@ const ProductDetails = () => {
           <CardHeader className="px-6 pt-6">
             <CardTitle className="text-xl text-[#11392f]">Product story</CardTitle>
             <CardDescription className="text-base leading-7 text-[#607c72]">
-              {product.description || "A dependable everyday grocery pick chosen for taste, freshness, and convenience."}
+              {product.description || "See the product pack for complete product information."}
             </CardDescription>
           </CardHeader>
           <Separator className="bg-[#efe7d8]" />
@@ -524,7 +523,7 @@ const ProductDetails = () => {
             <div>
               <h3 className="text-base font-semibold text-[#123d31]">Why you'll like it</h3>
               <div className="mt-4 space-y-3">
-                {(product.benefits?.length ? product.benefits : ["Fresh quality you can trust every day."]).map((benefit) => (
+                {(product.benefits?.length ? product.benefits : product.tags?.slice(0, 3) || [product.categoryLabel]).map((benefit) => (
                   <div
                     key={benefit}
                     className="flex items-start gap-3 rounded-[18px] bg-[#f8fcf9] px-4 py-3 text-sm leading-6 text-[#648176]"
@@ -540,7 +539,7 @@ const ProductDetails = () => {
               <div className="rounded-[20px] border border-[#e7efe8] bg-[#f9fcfa] p-4">
                 <h3 className="text-base font-semibold text-[#123d31]">Storage instructions</h3>
                 <p className="mt-2 text-sm leading-6 text-[#648176]">
-                  {product.storage || "Store in a cool, clean place and follow pack instructions for best freshness."}
+                  {product.storage || "Follow the storage instructions printed on the product pack."}
                 </p>
               </div>
             </div>
@@ -565,7 +564,7 @@ const ProductDetails = () => {
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6d8b7f]">
                 Gallery items
               </p>
-              <p className="mt-2 text-base font-semibold text-[#2f3f35]}">{gallery.length || 1} views available</p>
+              <p className="mt-2 text-base font-semibold text-[#2f3f35]">{gallery.length || 1} view{(gallery.length || 1) === 1 ? "" : "s"} available</p>
             </div>
             <div className="rounded-[20px] border border-[#e7eee9] bg-white px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6d8b7f]">
@@ -581,17 +580,11 @@ const ProductDetails = () => {
         <section className="space-y-5">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-[#113a2f]">Frequently bought together</h2>
+              <h2 className="text-2xl font-bold text-[#113a2f]">You may also need</h2>
               <p className="mt-1 text-sm text-[#648176]">
-                Customers also added these for the perfect bundle.
+                More products from the same grocery category.
               </p>
             </div>
-            <Button
-              variant="ghost"
-              className="rounded-full text-[#16704b] hover:bg-white/45"
-            >
-              View All
-            </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">

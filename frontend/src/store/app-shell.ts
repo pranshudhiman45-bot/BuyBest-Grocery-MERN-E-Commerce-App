@@ -8,7 +8,9 @@ export type AppView =
   | "product"
   | "cart"
   | "checkout"
-  | "checkout"
+  | "account"
+  | "orders"
+  | "order"
   | "admin"
   | "login"
   | "support"
@@ -19,6 +21,7 @@ type AppShellState = {
   activeView: AppView
   previousView: AppView
   selectedProductId: string | null
+  selectedOrderId: string | null
   selectedCategory: string
   loginMessage: string
   loginError: string
@@ -32,6 +35,7 @@ const DEFAULT_STATE: AppShellState = {
   activeView: "shop",
   previousView: "shop",
   selectedProductId: null,
+  selectedOrderId: null,
   selectedCategory: "all",
   loginMessage: "",
   loginError: "",
@@ -41,42 +45,60 @@ const DEFAULT_STATE: AppShellState = {
 
 const mapPathToView = (pathname: string): Pick<
   AppShellState,
-  "activeView" | "selectedProductId"
+  "activeView" | "selectedProductId" | "selectedOrderId"
 > => {
   if (pathname === "/offers") {
-    return { activeView: "offers", selectedProductId: null }
+    return { activeView: "offers", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/about") {
-    return { activeView: "about", selectedProductId: null }
+    return { activeView: "about", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/cart") {
-    return { activeView: "cart", selectedProductId: null }
+    return { activeView: "cart", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/checkout") {
-    return { activeView: "checkout", selectedProductId: null }
+    return { activeView: "checkout", selectedProductId: null, selectedOrderId: null }
+  }
+
+  if (pathname === "/account") {
+    return { activeView: "account", selectedProductId: null, selectedOrderId: null }
+  }
+
+  if (pathname === "/orders") {
+    return { activeView: "orders", selectedProductId: null, selectedOrderId: null }
+  }
+
+  const orderMatch = pathname.match(/^\/orders\/([^/]+)$/)
+
+  if (orderMatch) {
+    return {
+      activeView: "order",
+      selectedProductId: null,
+      selectedOrderId: decodeURIComponent(orderMatch[1]),
+    }
   }
 
   if (pathname === "/admin") {
-    return { activeView: "admin", selectedProductId: null }
+    return { activeView: "admin", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/login") {
-    return { activeView: "login", selectedProductId: null }
+    return { activeView: "login", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/reset-password") {
-    return { activeView: "reset-password", selectedProductId: null }
+    return { activeView: "reset-password", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/support") {
-    return { activeView: "support", selectedProductId: null }
+    return { activeView: "support", selectedProductId: null, selectedOrderId: null }
   }
 
   if (pathname === "/support-panel") {
-    return { activeView: "support-panel", selectedProductId: null }
+    return { activeView: "support-panel", selectedProductId: null, selectedOrderId: null }
   }
 
   const productMatch = pathname.match(/^\/products\/([^/]+)$/)
@@ -85,10 +107,11 @@ const mapPathToView = (pathname: string): Pick<
     return {
       activeView: "product",
       selectedProductId: decodeURIComponent(productMatch[1]),
+      selectedOrderId: null,
     }
   }
 
-  return { activeView: "shop", selectedProductId: null }
+  return { activeView: "shop", selectedProductId: null, selectedOrderId: null }
 }
 
 const mapRedirectToView = (redirect: string | null): AppView | null => {
@@ -101,6 +124,10 @@ const mapRedirectToView = (redirect: string | null): AppView | null => {
       return "cart"
     case "/checkout":
       return "checkout"
+    case "/account":
+      return "account"
+    case "/orders":
+      return "orders"
     case "/admin":
       return "admin"
     case "/support":
@@ -118,12 +145,13 @@ const getInitialState = (): AppShellState => {
   }
 
   const url = new URL(window.location.href)
-  const { activeView, selectedProductId } = mapPathToView(url.pathname)
+  const { activeView, selectedProductId, selectedOrderId } = mapPathToView(url.pathname)
 
   return {
     activeView,
     previousView: activeView === "login" ? "shop" : "shop",
     selectedProductId,
+    selectedOrderId,
     selectedCategory: url.searchParams.get("category") || "all",
     loginMessage: url.searchParams.get("message") || "",
     loginError: url.searchParams.get("error") || "",
@@ -143,6 +171,11 @@ const getRedirectPath = (view: AppView | null) => {
       return "/cart"
     case "checkout":
       return "/checkout"
+    case "account":
+      return "/account"
+    case "orders":
+    case "order":
+      return "/orders"
     case "admin":
       return "/admin"
     case "support":
@@ -190,6 +223,18 @@ export const getAppShellUrl = (state: PublicAppShellState) => {
 
   if (state.activeView === "checkout") {
     return "/checkout"
+  }
+
+  if (state.activeView === "account") {
+    return "/account"
+  }
+
+  if (state.activeView === "orders") {
+    return "/orders"
+  }
+
+  if (state.activeView === "order" && state.selectedOrderId) {
+    return `/orders/${encodeURIComponent(state.selectedOrderId)}`
   }
 
   if (state.activeView === "admin") {
@@ -278,6 +323,33 @@ const appShellSlice = createSlice({
       state.activeView = "checkout"
       state.selectedProductId = null
     },
+    openAccount: (state) => {
+      if (state.activeView !== "account") {
+        state.previousView = state.activeView
+      }
+
+      state.activeView = "account"
+      state.selectedProductId = null
+      state.selectedOrderId = null
+    },
+    openOrders: (state) => {
+      if (state.activeView !== "orders") {
+        state.previousView = state.activeView
+      }
+
+      state.activeView = "orders"
+      state.selectedProductId = null
+      state.selectedOrderId = null
+    },
+    openOrder: (state, action: PayloadAction<string>) => {
+      if (state.activeView !== "order") {
+        state.previousView = state.activeView
+      }
+
+      state.activeView = "order"
+      state.selectedProductId = null
+      state.selectedOrderId = action.payload
+    },
     openAdmin: (state) => {
       if (state.activeView !== "admin") {
         state.previousView = state.activeView
@@ -359,6 +431,7 @@ const appShellSlice = createSlice({
       state.activeView = action.payload.activeView
       state.previousView = action.payload.previousView
       state.selectedProductId = action.payload.selectedProductId
+      state.selectedOrderId = action.payload.selectedOrderId
       state.selectedCategory = action.payload.selectedCategory
       state.loginMessage = action.payload.loginMessage
       state.loginError = action.payload.loginError

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { LayoutDashboard, LogOut, MapPin, Search, ShoppingCart, TriangleAlert, UserCog, X } from "lucide-react"
+import { Grid2X2, Home, LayoutDashboard, LogOut, MapPin, Package, Search, ShoppingCart, TriangleAlert, UserCog, UserRound, X } from "lucide-react"
 
 import Logo from "../../assests/image.png"
 import { ProfileEditorSheet } from "@/components/profile/ProfileEditorSheet"
@@ -78,7 +78,15 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
   const [activeIndex, setActiveIndex] = useState(-1)
   const [debounced, setDebounced] = useState("")
   const [loading, setLoading] = useState(false)
-  const [locationName, setLocationName] = useState("Detect Location")
+  const [locationName, setLocationName] = useState(() => {
+    try {
+      return window.localStorage.getItem("buybest.shopping-area") || "Set shopping area"
+    } catch {
+      return "Set shopping area"
+    }
+  })
+  const [manualLocation, setManualLocation] = useState("")
+  const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [locationAlert, setLocationAlert] = useState("")
   const [isLogoutAlertOpen, setIsLogoutAlertOpen] = useState(false)
@@ -159,7 +167,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
 
     const full = SEARCH_PLACEHOLDERS[index].highlight
     let currentIndex = 0
-    setTyped("")
+    const resetTimeout = window.setTimeout(() => setTyped(""), 0)
 
     const id = setInterval(() => {
       setTyped(full.slice(0, currentIndex + 1))
@@ -169,38 +177,44 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
       }
     }, 40)
 
-    return () => clearInterval(id)
+    return () => {
+      window.clearTimeout(resetTimeout)
+      clearInterval(id)
+    }
   }, [index, value])
 
   useEffect(() => {
-    if (!debounced) {
-      setFiltered([])
-      setActiveIndex(-1)
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
     let isCancelled = false
+    const startSearchTimeout = window.setTimeout(() => {
+      if (!debounced) {
+        setFiltered([])
+        setActiveIndex(-1)
+        setLoading(false)
+        return
+      }
 
-    const loadProducts = async () => {
-      try {
-        const results = await searchProducts(debounced)
-        if (!isCancelled) {
-          setFiltered(results)
-          setActiveIndex(-1)
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false)
+      setLoading(true)
+
+      const loadProducts = async () => {
+        try {
+          const results = await searchProducts(debounced)
+          if (!isCancelled) {
+            setFiltered(results)
+            setActiveIndex(-1)
+          }
+        } finally {
+          if (!isCancelled) {
+            setLoading(false)
+          }
         }
       }
-    }
 
-    void loadProducts()
+      void loadProducts()
+    }, 0)
 
     return () => {
       isCancelled = true
+      window.clearTimeout(startSearchTimeout)
     }
   }, [debounced, searchProducts])
 
@@ -240,6 +254,8 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             "Your Location"
 
           setLocationName(city)
+          window.localStorage.setItem("buybest.shopping-area", city)
+          setIsLocationDialogOpen(false)
         } catch {
           setLocationName("Location found")
         } finally {
@@ -257,6 +273,27 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
         timeout: 12000,
       }
     )
+  }
+
+  const handleSaveManualLocation = () => {
+    const nextLocation = manualLocation.trim()
+    if (nextLocation.length < 2) {
+      setLocationAlert("Enter a city, locality, or postal code.")
+      return
+    }
+
+    setLocationName(nextLocation)
+    try {
+      window.localStorage.setItem("buybest.shopping-area", nextLocation)
+    } catch {
+      // The selected area still remains available for this session.
+    }
+    setManualLocation("")
+    setIsLocationDialogOpen(false)
+  }
+
+  const handleMobileSearchFocus = () => {
+    document.getElementById("mobile-product-search")?.focus()
   }
 
   const handleLogoutConfirm = async () => {
@@ -280,7 +317,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
           <div className="flex min-w-0 items-center gap-4 md:gap-6">
             <button
               type="button"
-              className="flex items-center"
+              className="flex items-center gap-2"
               onClick={() => dispatch(appShellActions.openShop(undefined))}
             >
               <img
@@ -288,6 +325,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                 alt="Buy Best Logo"
                 className="h-9 w-auto object-contain"
               />
+              <span className="hidden text-lg font-black tracking-tight text-[#173b31] sm:inline">Buy Best</span>
             </button>
 
             <div className="hidden items-center gap-2 lg:flex">
@@ -313,6 +351,20 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                     className={navButtonClass(activeView === "cart" || activeView === "checkout")}
                   >
                     Cart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(appShellActions.openOrders())}
+                    className={navButtonClass(activeView === "orders" || activeView === "order")}
+                  >
+                    Orders
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(appShellActions.openAccount())}
+                    className={navButtonClass(activeView === "account")}
+                  >
+                    Account
                   </button>
                 </>
               ) : null}
@@ -439,7 +491,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                 variant="ghost"
                 className="hidden h-10 items-center gap-2 rounded-full border border-[#ece4d6] bg-white px-3 text-[#7d6d52] hover:bg-[#faf4e8] md:flex"
                 title="Delivery location"
-                onClick={handleDetectLocation}
+                onClick={() => setIsLocationDialogOpen(true)}
               >
                 <MapPin className="h-4 w-4 text-[#a78410]" />
                 <span className="max-w-28 truncate text-sm font-medium">
@@ -497,6 +549,18 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {user.role !== "support" ? (
+                    <>
+                      <DropdownMenuItem onSelect={() => dispatch(appShellActions.openAccount())}>
+                        <UserRound />
+                        Account
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => dispatch(appShellActions.openOrders())}>
+                        <Package />
+                        My Orders
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
                   {user.role === "admin" ? (
                     <DropdownMenuItem onSelect={() => dispatch(appShellActions.openAdmin())}>
                       <LayoutDashboard />
@@ -539,7 +603,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             {canUseLocation ? (
               <button
                 type="button"
-                onClick={handleDetectLocation}
+                onClick={() => setIsLocationDialogOpen(true)}
                 disabled={isLocating}
                 className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#ece4d6] bg-white px-3 py-2 text-xs font-semibold text-[#7d6d52] transition hover:bg-[#faf4e8] disabled:opacity-70"
               >
@@ -605,6 +669,7 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a8d74]" />
             <Input
               type="search"
+              id="mobile-product-search"
               value={value}
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {
@@ -678,6 +743,48 @@ const Navbar = ({ user, onUserUpdate, onLogout, isLoggingOut = false }: NavbarPr
           </div>
         </div>
       </nav>
+
+      {user?.role !== "support" ? (
+        <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e7e1d5] bg-white/96 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[0_-10px_30px_rgba(44,36,23,0.08)] backdrop-blur-lg md:hidden">
+          <div className="mx-auto grid max-w-md grid-cols-5">
+            {[
+              { label: "Home", icon: Home, active: activeView === "shop" || activeView === "product", action: () => dispatch(appShellActions.openShop(undefined)) },
+              { label: "Categories", icon: Grid2X2, active: false, action: () => { dispatch(appShellActions.openShop(undefined)); window.setTimeout(() => document.getElementById("categories")?.scrollIntoView({ behavior: "smooth" }), 50) } },
+              { label: "Search", icon: Search, active: false, action: handleMobileSearchFocus },
+              { label: "Cart", icon: ShoppingCart, active: activeView === "cart" || activeView === "checkout", action: () => dispatch(appShellActions.openCart()) },
+              { label: "Account", icon: UserRound, active: activeView === "account" || activeView === "orders" || activeView === "order", action: () => dispatch(appShellActions.openAccount()) },
+            ].map((item) => {
+              const Icon = item.icon
+              return (
+                <button key={item.label} type="button" onClick={item.action} className={`relative flex min-h-13 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-semibold ${item.active ? "text-[#16834a]" : "text-[#718078]"}`}>
+                  <Icon className="size-5" />
+                  <span>{item.label}</span>
+                  {item.label === "Cart" && cartSummary.itemCount > 0 ? <span className="absolute right-[24%] top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[#f2c94c] px-1 text-[9px] font-bold text-[#2c2417]">{cartSummary.itemCount}</span> : null}
+                </button>
+              )
+            })}
+          </div>
+        </nav>
+      ) : null}
+
+      {isLocationDialogOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-[#1d2b24]/30 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-labelledby="location-dialog-title">
+          <button type="button" className="absolute inset-0" aria-label="Close location dialog" onClick={() => setIsLocationDialogOpen(false)} />
+          <div className="relative w-full max-w-md rounded-[26px] border border-[#e5dfd3] bg-white p-5 shadow-2xl sm:p-6">
+            <button type="button" aria-label="Close" onClick={() => setIsLocationDialogOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-[#718078] hover:bg-[#f4f2ec]"><X className="size-4" /></button>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#16834a]">Shopping area</p>
+            <h2 id="location-dialog-title" className="mt-1 text-2xl font-bold text-[#21352b]">Where are you shopping from?</h2>
+            <p className="mt-2 text-sm leading-6 text-[#718078]">This helps personalise your shopping context. It does not guarantee delivery coverage.</p>
+            <label htmlFor="shopping-area" className="mt-5 block text-sm font-semibold text-[#334a3e]">City, locality, or postal code</label>
+            <div className="mt-2 flex gap-2">
+              <Input id="shopping-area" value={manualLocation} onChange={(event) => setManualLocation(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") handleSaveManualLocation() }} placeholder="e.g. Mohali or 160055" className="h-11 rounded-xl" />
+              <Button type="button" className="h-11 rounded-xl bg-[#16834a] hover:bg-[#116d3d]" onClick={handleSaveManualLocation}>Save</Button>
+            </div>
+            <div className="my-4 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-[#9aa59e]"><span className="h-px flex-1 bg-[#e7ebe8]" />or<span className="h-px flex-1 bg-[#e7ebe8]" /></div>
+            <Button type="button" variant="outline" className="h-11 w-full rounded-xl" disabled={isLocating} onClick={handleDetectLocation}><MapPin className="size-4" />{isLocating ? "Detecting…" : "Use current location"}</Button>
+          </div>
+        </div>
+      ) : null}
 
       {isLogoutAlertOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#2c2417]/25 px-4 backdrop-blur-sm">

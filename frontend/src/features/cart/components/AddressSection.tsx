@@ -462,6 +462,10 @@ export function AddressSection({
             <Label htmlFor="postal-code">Postal code</Label>
             <Input
               id="postal-code"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              maxLength={6}
+              pattern="[1-9][0-9]{5}"
               value={formState.postalCode}
               onChange={(event) => updateFormState("postalCode", event.target.value)}
               placeholder="Postal code"
@@ -472,6 +476,11 @@ export function AddressSection({
             <Label htmlFor="mobile">Mobile</Label>
             <Input
               id="mobile"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={10}
+              pattern="[6-9][0-9]{9}"
               value={formState.mobile}
               onChange={(event) => updateFormState("mobile", event.target.value)}
               placeholder="Mobile number"

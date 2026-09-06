@@ -80,14 +80,18 @@ const validateAddressPayload = (payload) => {
   } = payload
 
   const normalizedMobile = String(mobile || '').trim()
-  const numericMobile = Number(normalizedMobile)
+  const normalizedPostalCode = String(postalCode || '').trim()
 
   if (!addressLine || !city || !state || !postalCode || !normalizedMobile) {
     throw new AppError('Please provide complete address details', 400)
   }
 
-  if (!Number.isFinite(numericMobile)) {
-    throw new AppError('Please provide a valid mobile number', 400)
+  if (!/^[6-9][0-9]{9}$/.test(normalizedMobile)) {
+    throw new AppError('Please provide a valid 10-digit Indian mobile number', 400)
+  }
+
+  if (!/^[1-9][0-9]{5}$/.test(normalizedPostalCode)) {
+    throw new AppError('Please provide a valid 6-digit Indian postal code', 400)
   }
 
   return {
@@ -95,8 +99,8 @@ const validateAddressPayload = (payload) => {
     street: street.trim(),
     city: city.trim(),
     state: state.trim(),
-    postalCode: postalCode.trim(),
-    mobile: numericMobile,
+    postalCode: normalizedPostalCode,
+    mobile: normalizedMobile,
     country: String(country || '').trim() || 'India'
   }
 }

@@ -23,8 +23,25 @@ const orderSchema = new mongoose.Schema(
     productDetails: {
       _id: String,
       name: String,
+      brand: String,
+      size: String,
+      price: Number,
       image: Array
     },
+    items: [{
+      productId: {
+        type: mongoose.Schema.ObjectId,
+        ref: 'product'
+      },
+      productSlug: String,
+      name: String,
+      brand: String,
+      size: String,
+      image: String,
+      quantity: Number,
+      unitPrice: Number,
+      lineTotal: Number
+    }],
     quantity: {
       type: Number,
       default: 1
@@ -39,7 +56,17 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'processing', 'completed', 'failed']
+      enum: ['pending', 'processing', 'completed', 'failed'],
+      default: 'pending'
+    },
+    orderStatus: {
+      type: String,
+      enum: ['placed', 'confirmed', 'packed', 'out_for_delivery', 'delivered', 'cancelled'],
+      default: 'placed'
+    },
+    inventoryReserved: {
+      type: Boolean,
+      default: false
     },
     couponCode: {
       type: String,
@@ -50,6 +77,22 @@ const orderSchema = new mongoose.Schema(
       ref: 'address'
     },
     subToatl: {
+      type: Number,
+      default: 0
+    },
+    subtotal: {
+      type: Number,
+      default: 0
+    },
+    discount: {
+      type: Number,
+      default: 0
+    },
+    deliveryFee: {
+      type: Number,
+      default: 0
+    },
+    tax: {
       type: Number,
       default: 0
     },
@@ -64,6 +107,9 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 )
+
+orderSchema.index({ userId: 1, createdAt: -1 })
+orderSchema.index({ orderStatus: 1, createdAt: -1 })
 
 const orderModel = mongoose.model('order', orderSchema)
 

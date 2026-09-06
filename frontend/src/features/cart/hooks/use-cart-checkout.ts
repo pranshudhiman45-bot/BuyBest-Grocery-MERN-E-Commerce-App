@@ -1,26 +1,21 @@
 import { useRef, useState } from "react"
 
+import type { CheckoutResponse } from "@/lib/store-api"
 import { formatPrice } from "@/lib/storefront"
 
 type UseCartCheckoutOptions = {
-  checkoutCart: (paymentMethod: string, couponCode?: string, idempotencyKey?: string) => Promise<{
-    message: string
-    summary: {
-      total: number
-    }
-  }>
+  checkoutCart: (
+    paymentMethod: string,
+    couponCode?: string,
+    idempotencyKey?: string
+  ) => Promise<CheckoutResponse>
   createOnlineCheckoutSession: (paymentMethod: string, couponCode?: string, idempotencyKey?: string) => Promise<{
     sessionId: string
     url: string | null
   }>
   onBeforeCheckout?: () => boolean | Promise<boolean>
-  getSuccessMessage?: (response: {
-    message: string
-    summary: {
-      total: number
-    }
-  }) => string
-  onCheckoutSuccess?: (response: any) => void
+  getSuccessMessage?: (response: CheckoutResponse) => string
+  onCheckoutSuccess?: (response: CheckoutResponse) => void
 }
 
 export function useCartCheckout({

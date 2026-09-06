@@ -26,6 +26,11 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    subcategory: {
+      type: String,
+      default: '',
+      trim: true
+    },
     size: {
       type: String,
       default: ''
@@ -33,7 +38,7 @@ const productSchema = new mongoose.Schema(
     price: {
       type: Number,
       required: true,
-      min: 0
+      min: 0.01
     },
     originalPrice: {
       type: Number,
@@ -67,7 +72,11 @@ const productSchema = new mongoose.Schema(
     stock: {
       type: Number,
       default: 0,
-      min: 0
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: 'Stock must be a whole number'
+      }
     },
     maxPerOrder: {
       type: Number,
@@ -102,6 +111,10 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    featured: {
+      type: Boolean,
+      default: false
+    },
     publish: {
       type: Boolean,
       default: true
@@ -110,7 +123,8 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-
+productSchema.index({ category: 1, publish: 1 })
+productSchema.index({ name: 'text', brand: 'text', categoryLabel: 'text', subcategory: 'text', tags: 'text' })
 
 const productModel = mongoose.model('product', productSchema)
 

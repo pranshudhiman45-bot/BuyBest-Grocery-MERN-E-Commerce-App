@@ -5,10 +5,18 @@ const { USER_ROLES } = require('./constants/auth.constants.js')
 
 const seedSupportUser = async () => {
   try {
+    if (!env.supportEmail || !env.supportPassword) {
+      throw new Error('SUPPORT_EMAIL and SUPPORT_PASSWORD are required to seed a support account.')
+    }
+
+    if (env.supportPassword.length < 12) {
+      throw new Error('SUPPORT_PASSWORD must contain at least 12 characters.')
+    }
+
     await mongoose.connect(env.mongoUri)
     console.log('Connected to MongoDB for seeding.')
 
-    const email = 'support@example.com'
+    const email = env.supportEmail.trim().toLowerCase()
     const existing = await User.findOne({ email })
     if (existing) {
       existing.role = USER_ROLES.SUPPORT
@@ -18,12 +26,12 @@ const seedSupportUser = async () => {
       const supportUser = new User({
         name: 'Technical Support',
         email,
-        password: 'password123',
+        password: env.supportPassword,
         role: USER_ROLES.SUPPORT,
         isVerified: true
       })
       await supportUser.save()
-      console.log('Created new support user: support@example.com / password123')
+      console.log(`Created support user: ${email}`)
     }
 
     process.exit(0)

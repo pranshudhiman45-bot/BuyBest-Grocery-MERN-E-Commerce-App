@@ -117,9 +117,23 @@ router.post('/cancel-session/:sessionId', asyncHandler(async (req, res) => {
     throw new AppError('Session ID is required', 400)
   }
 
-  await cancelStripeSessionOrders(sessionId)
+  const session = await getStripeSessionStatus(sessionId)
 
-  res.status(200).json({ message: 'Cancelled session orders deleted' })
+  if (session.metadata?.userId !== req.user._id.toString()) {
+    throw new AppError('This Stripe session does not belong to the current user', 403)
+  }
+
+  if (session.payment_status === 'paid' || session.status === 'complete') {
+    throw new AppError('A completed payment session cannot be cancelled', 409)
+  }
+
+  if (session.status === 'open') {
+    await stripe.checkout.sessions.expire(sessionId)
+  }
+
+  await cancelStripeSessionOrders(sessionId, req.user._id)
+
+  res.status(200).json({ message: 'Cancelled checkout recorded' })
 }))
 
 module.exports = router

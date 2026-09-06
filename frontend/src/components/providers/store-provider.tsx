@@ -14,6 +14,7 @@ import { Check, ShoppingCart, X } from "lucide-react"
 
 import {
   addCartItem as addCartItemApi,
+  clearCart as clearCartApi,
   checkoutCart as checkoutCartApi,
   fetchAppSettings,
   fetchCart,
@@ -34,7 +35,8 @@ const DELIVERY_FEE = 40
 const FREE_DELIVERY_THRESHOLD = 300
 const DEFAULT_TAX_PERCENTAGE = 5
 const STORE_CACHE_TTL_MS = 60 * 1000
-let guestCartEntries: GuestCartEntry[] = []
+const GUEST_CART_STORAGE_KEY = "buybest.guest-cart.v1"
+let memoryGuestCartEntries: GuestCartEntry[] = []
 let cachedProducts: { value: Product[]; expiresAt: number } | null = null
 let cachedSettings: { value: { taxPercentage: number }; expiresAt: number } | null = null
 
@@ -63,6 +65,7 @@ type StoreContextValue = {
   isCartLoading: boolean
   refreshCart: () => Promise<void>
   clearCartState: () => void
+  clearCart: () => Promise<void>
   addToCart: (productId: string, quantity?: number) => Promise<void>
   updateCartQuantity: (productId: string, quantity: number) => Promise<void>
   removeFromCart: (productId: string) => Promise<void>
@@ -97,18 +100,56 @@ const normalizeMaxPerOrder = (value?: number | null) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
+const isValidGuestCartEntry = (entry: unknown): entry is GuestCartEntry => {
+  if (!entry || typeof entry !== "object") {
+    return false
+  }
+
+  const candidate = entry as Partial<GuestCartEntry>
+  return (
+    typeof candidate.productId === "string" &&
+    candidate.productId.length > 0 &&
+    typeof candidate.quantity === "number" &&
+    Number.isInteger(candidate.quantity) &&
+    candidate.quantity > 0
+  )
+}
+
 const readGuestCartEntries = () => {
-  return guestCartEntries
+  if (typeof window === "undefined") {
+    return memoryGuestCartEntries
+  }
+
+  try {
+    const storedCart = window.localStorage.getItem(GUEST_CART_STORAGE_KEY)
+    if (!storedCart) {
+      return memoryGuestCartEntries
+    }
+
+    const entries = JSON.parse(storedCart) as unknown
+    return Array.isArray(entries) ? entries.filter(isValidGuestCartEntry) : []
+  } catch {
+    return memoryGuestCartEntries
+  }
 }
 
 const writeGuestCartEntries = (entries: GuestCartEntry[]) => {
-  guestCartEntries = entries.filter(
-    (entry) =>
-      typeof entry?.productId === "string" &&
-      entry.productId.length > 0 &&
-      typeof entry.quantity === "number" &&
-      entry.quantity > 0
-  )
+  memoryGuestCartEntries = entries.filter(isValidGuestCartEntry)
+
+  if (typeof window !== "undefined") {
+    try {
+      if (memoryGuestCartEntries.length > 0) {
+        window.localStorage.setItem(
+          GUEST_CART_STORAGE_KEY,
+          JSON.stringify(memoryGuestCartEntries)
+        )
+      } else {
+        window.localStorage.removeItem(GUEST_CART_STORAGE_KEY)
+      }
+    } catch {
+      // The in-memory cart remains usable if storage is unavailable.
+    }
+  }
 }
 
 const fetchCachedProducts = async () => {
@@ -366,8 +407,23 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     syncCartState({ items: [], summary: emptySummary })
   }, [syncCartState])
 
+  const clearCart = useCallback(async () => {
+    if (currentUser) {
+      const data = await clearCartApi()
+      syncCartState(data)
+      return
+    }
+
+    writeGuestCartEntries([])
+    syncCartState({ items: [], summary: emptySummary })
+  }, [currentUser, syncCartState])
+
   useEffect(() => {
-    void refreshCart()
+    const refreshTimeout = window.setTimeout(() => {
+      void refreshCart()
+    }, 0)
+
+    return () => window.clearTimeout(refreshTimeout)
   }, [refreshCart])
 
   useEffect(() => {
@@ -538,6 +594,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       isCartLoading,
       refreshCart,
       clearCartState,
+      clearCart,
       addToCart,
       updateCartQuantity,
       removeFromCart,
@@ -549,6 +606,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       cartItems,
       cartQuantities,
       cartSummary,
+      clearCart,
       clearCartState,
       checkoutCart,
       isCartLoading,

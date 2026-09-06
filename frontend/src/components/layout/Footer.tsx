@@ -1,4 +1,4 @@
-import { Globe, Mail } from "lucide-react"
+import { Globe, LifeBuoy } from "lucide-react"
 
 import type { AuthUser } from "@/lib/auth"
 import { appShellActions, useAppShellDispatch } from "@/store/app-shell"
@@ -47,7 +47,7 @@ const Footer = ({ currentUser = null }: FooterProps) => {
   }
 
   return (
-    <footer className="border-t border-[#ece4d6] bg-white">
+    <footer className="border-t border-[#ece4d6] bg-white pb-16 md:pb-0">
       <div className="mx-auto max-w-6xl px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-6 text-base text-[#6b5e4a]">
         <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4">
           <span className="font-semibold text-lg text-[#2c2417]">Buy Best</span>
@@ -70,13 +70,11 @@ const Footer = ({ currentUser = null }: FooterProps) => {
         <div className="flex items-center gap-5">
           <button
             type="button"
-            aria-label="Email support"
-            onClick={() => {
-              window.location.href = "mailto:pranshudhiman90@gmail.com"
-            }}
+            aria-label="Open support"
+            onClick={() => handleFooterAction("support")}
             className="cursor-pointer hover:text-black transition"
           >
-            <Mail className="h-5 w-5" />
+            <LifeBuoy className="h-5 w-5" />
           </button>
           <button
             type="button"

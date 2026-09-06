@@ -1,4 +1,5 @@
 const Stripe = require('stripe')
+const mongoose = require('mongoose')
 
 const env = require('../config/env.js')
 const AppError = require('../utils/app-error.js')
@@ -208,6 +209,17 @@ const buildCheckoutContext = async (user, { addressId, couponCode } = {}) => {
 
     assertQuantityAvailable(product, cartItem.quantity)
 
+    cartItem.name = product.name
+    cartItem.brand = product.brand
+    cartItem.category = product.categoryLabel || product.category
+    cartItem.sizeLabel = product.size
+    cartItem.imageLabel = product.imageLabel
+    cartItem.imageUrl = product.images?.[0] || null
+    cartItem.accent = product.accent
+    cartItem.price = product.price
+    cartItem.totalPrice = Number((product.price * cartItem.quantity).toFixed(2))
+    await cartItem.save()
+
     checkoutItems.push({
       cartItem,
       productDocument,
@@ -243,35 +255,93 @@ const createOrderRecords = async ({
   paymentId = null,
   paymentMethod,
   paymentStatus,
-  couponCode = null
+  couponCode = null,
+  summary,
+  couponDiscount = 0,
+  payableTotal,
+  inventoryReserved = false,
+  session = null
 }) => {
-  const orders = []
+  const orderItems = checkoutItems.map((item) => ({
+    productId: item.productDocument._id,
+    productSlug: item.productDocument.slug,
+    name: item.snapshot.name,
+    brand: item.snapshot.brand,
+    size: item.snapshot.size,
+    image: item.snapshot.imageUrl,
+    quantity: item.snapshot.quantity,
+    unitPrice: item.snapshot.price,
+    lineTotal: item.snapshot.totalPrice
+  }))
+  const firstItem = checkoutItems[0]
+  const orderPayload = {
+    userId,
+    orderId: buildOrderId(),
+    productId: firstItem.productDocument._id,
+    productSlug: firstItem.productDocument.slug,
+    productDetails: {
+      _id: firstItem.productDocument._id.toString(),
+      name: firstItem.snapshot.name,
+      brand: firstItem.snapshot.brand,
+      size: firstItem.snapshot.size,
+      price: firstItem.snapshot.price,
+      image: firstItem.productDocument.images || []
+    },
+    items: orderItems,
+    quantity: summary.itemCount,
+    paymentId,
+    paymentMethod,
+    paymentStatus,
+    orderStatus: 'placed',
+    inventoryReserved,
+    couponCode,
+    deliveryAddress: selectedAddress._id,
+    subToatl: summary.subtotal,
+    subtotal: summary.subtotal,
+    discount: couponDiscount,
+    deliveryFee: summary.deliveryFee,
+    tax: summary.tax,
+    total: payableTotal
+  }
+  const orderRecord = session
+    ? (await orderModel.create([orderPayload], { session }))[0]
+    : await orderModel.create(orderPayload)
 
-  for (const item of checkoutItems) {
-    const orderRecord = await orderModel.create({
-      userId,
-      orderId: buildOrderId(),
-      productId: item.productDocument._id,
-      productSlug: item.productDocument.slug,
-      productDetails: {
-        _id: item.productDocument._id.toString(),
-        name: item.productDocument.name,
-        image: item.productDocument.images || []
+  return [orderRecord]
+}
+
+const releaseInventory = async (reservedItems) => {
+  await Promise.all(reservedItems.map((item) => productModel.updateOne(
+    { _id: item.productId },
+    { $inc: { stock: item.quantity } }
+  )))
+}
+
+const reserveInventory = async (items, session = null) => {
+  const reservedItems = []
+
+  for (const item of items) {
+    const result = await productModel.updateOne(
+      {
+        _id: item.productId,
+        stock: { $gte: item.quantity },
+        publish: { $ne: false }
       },
-      quantity: item.cartItem.quantity,
-      paymentId,
-      paymentMethod,
-      paymentStatus,
-      couponCode,
-      deliveryAddress: selectedAddress._id,
-      subToatl: Number((item.cartItem.price * item.cartItem.quantity).toFixed(2)),
-      total: item.cartItem.totalPrice
-    })
+      { $inc: { stock: -item.quantity } },
+      session ? { session } : undefined
+    )
 
-    orders.push(orderRecord)
+    if (result.matchedCount === 0) {
+      if (!session) {
+        await releaseInventory(reservedItems)
+      }
+      throw new AppError(`${item.name} is no longer available in the requested quantity`, 409)
+    }
+
+    reservedItems.push(item)
   }
 
-  return orders
+  return reservedItems
 }
 
 const attachOrdersToUserHistory = async (userId, orders) => {
@@ -305,27 +375,44 @@ const attachOrdersToUserHistory = async (userId, orders) => {
 
 const placeCashOnDeliveryOrder = async (user, { addressId, couponCode, paymentMethod }) => {
   const context = await buildCheckoutContext(user, { addressId, couponCode })
+  const inventoryItems = context.checkoutItems.map((item) => ({
+    productId: item.productDocument._id,
+    name: item.snapshot.name,
+    quantity: item.snapshot.quantity
+  }))
+  const transaction = await mongoose.startSession()
+  let orders
 
-  for (const item of context.checkoutItems) {
-    item.productDocument.stock =
-      normalizeStock(item.productDocument.stock) - item.cartItem.quantity
-    await item.productDocument.save()
+  try {
+    await transaction.withTransaction(async () => {
+      await reserveInventory(inventoryItems, transaction)
+      orders = await createOrderRecords({
+        userId: user._id,
+        selectedAddress: context.selectedAddress,
+        checkoutItems: context.checkoutItems,
+        paymentMethod,
+        paymentStatus: 'pending',
+        couponCode: context.coupon?.code || null,
+        summary: context.summary,
+        couponDiscount: context.couponDiscount,
+        payableTotal: context.payableTotal,
+        inventoryReserved: true,
+        session: transaction
+      })
+      await userModel.updateOne(
+        { _id: user._id },
+        { $addToSet: { orderHistory: orders[0]._id } },
+        { session: transaction }
+      )
+      await cartModel.deleteMany({ userId: user._id }, { session: transaction })
+    })
+  } finally {
+    await transaction.endSession()
   }
-
-  const orders = await createOrderRecords({
-    userId: user._id,
-    selectedAddress: context.selectedAddress,
-    checkoutItems: context.checkoutItems,
-    paymentMethod,
-    paymentStatus: 'pending',
-    couponCode: context.coupon?.code || null
-  })
-
-  await attachOrdersToUserHistory(user._id, orders)
-  await cartModel.deleteMany({ userId: user._id })
 
   return {
     message: 'Order placed successfully',
+    orderId: orders[0].orderId,
     paymentMethod,
     address: formatAddressResponse(context.selectedAddress),
     summary: {
@@ -347,7 +434,7 @@ const buildStripeLineItems = ({ purchasedItems, summary, payableTotal, coupon, c
         price_data: {
           currency: 'inr',
           product_data: {
-            name: 'Fresh Mart Order',
+            name: 'Buy Best Order',
             description
           },
           unit_amount: toPaise(payableTotal)
@@ -428,15 +515,37 @@ const createStripeCheckoutSession = async (
   })
 
   if (existingSessionOrderCount === 0) {
-    await createOrderRecords({
-      userId: user._id,
-      selectedAddress: context.selectedAddress,
-      checkoutItems: context.checkoutItems,
-      paymentId: session.id,
-      paymentMethod,
-      paymentStatus: 'pending',
-      couponCode: context.coupon?.code || null
-    })
+    const inventoryItems = context.checkoutItems.map((item) => ({
+      productId: item.productDocument._id,
+      name: item.snapshot.name,
+      quantity: item.snapshot.quantity
+    }))
+    const transaction = await mongoose.startSession()
+
+    try {
+      await transaction.withTransaction(async () => {
+        await reserveInventory(inventoryItems, transaction)
+        await createOrderRecords({
+          userId: user._id,
+          selectedAddress: context.selectedAddress,
+          checkoutItems: context.checkoutItems,
+          paymentId: session.id,
+          paymentMethod,
+          paymentStatus: 'pending',
+          couponCode: context.coupon?.code || null,
+          summary: context.summary,
+          couponDiscount: context.couponDiscount,
+          payableTotal: context.payableTotal,
+          inventoryReserved: true,
+          session: transaction
+        })
+      })
+    } catch (error) {
+      await stripeClient.checkout.sessions.expire(session.id).catch(() => undefined)
+      throw error
+    } finally {
+      await transaction.endSession()
+    }
   }
 
   return {
@@ -452,20 +561,26 @@ const finalizeStripeSessionOrders = async (sessionId) => {
     throw new AppError('No pending order found for this Stripe session', 404)
   }
 
-  const pendingOrders = orders.filter((order) =>
-    ['pending', 'processing'].includes(order.paymentStatus)
-  )
+  const pendingOrders = orders.filter((order) => order.paymentStatus === 'pending')
 
   if (pendingOrders.length === 0) {
     return orders
   }
 
   for (const order of pendingOrders) {
-    const quantity = Math.max(1, Number(order.quantity) || 1)
+    if (order.inventoryReserved) {
+      await orderModel.findOneAndUpdate(
+        { _id: order._id, paymentStatus: 'pending', inventoryReserved: true },
+        { $set: { paymentStatus: 'completed', orderStatus: 'confirmed' } },
+        { returnDocument: 'after', runValidators: true }
+      )
+      continue
+    }
+
     const claimedOrder = await orderModel.findOneAndUpdate(
       {
         _id: order._id,
-        paymentStatus: { $in: ['pending', 'processing'] }
+        paymentStatus: 'pending'
       },
       {
         paymentStatus: 'processing'
@@ -477,31 +592,40 @@ const finalizeStripeSessionOrders = async (sessionId) => {
       continue
     }
 
-    const stockUpdate = await productModel.updateOne(
-      {
-        _id: claimedOrder.productId,
-        stock: { $gte: quantity }
-      },
-      {
-        $inc: { stock: -quantity }
-      }
-    )
+    const inventoryItems = Array.isArray(claimedOrder.items) && claimedOrder.items.length > 0
+      ? claimedOrder.items.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: Math.max(1, Number(item.quantity) || 1)
+        }))
+      : [{
+          productId: claimedOrder.productId,
+          name: claimedOrder.productDetails?.name || 'Product',
+          quantity: Math.max(1, Number(claimedOrder.quantity) || 1)
+        }]
 
-    if (stockUpdate.matchedCount === 0) {
+    try {
+      await reserveInventory(inventoryItems)
+      claimedOrder.inventoryReserved = true
+    } catch (error) {
       claimedOrder.paymentStatus = 'failed'
+      claimedOrder.orderStatus = 'cancelled'
       await claimedOrder.save()
-      throw new AppError(`Not enough stock available to finalize order ${claimedOrder.orderId}`, 409)
+      throw error
     }
 
     claimedOrder.paymentStatus = 'completed'
+    claimedOrder.orderStatus = 'confirmed'
     await claimedOrder.save()
   }
 
   await attachOrdersToUserHistory(orders[0].userId, orders)
 
-  const productSlugs = orders
-    .map((order) => order.productSlug)
-    .filter(Boolean)
+  const productSlugs = orders.flatMap((order) =>
+    Array.isArray(order.items) && order.items.length > 0
+      ? order.items.map((item) => item.productSlug)
+      : [order.productSlug]
+  ).filter(Boolean)
 
   if (productSlugs.length > 0) {
     await cartModel.deleteMany({
@@ -513,23 +637,69 @@ const finalizeStripeSessionOrders = async (sessionId) => {
   return orderModel.find({ paymentId: sessionId }).sort({ createdAt: 1 })
 }
 
-const markStripeSessionOrdersFailed = async (sessionId) => {
-  await orderModel.updateMany(
-    {
-      paymentId: sessionId,
-      paymentStatus: 'pending'
-    },
-    {
-      paymentStatus: 'failed'
-    }
-  )
-}
+const getInventoryItemsFromOrder = (order) =>
+  Array.isArray(order.items) && order.items.length > 0
+    ? order.items.map((item) => ({
+        productId: item.productId,
+        quantity: Math.max(1, Number(item.quantity) || 1)
+      }))
+    : [{
+        productId: order.productId,
+        quantity: Math.max(1, Number(order.quantity) || 1)
+      }]
 
-const cancelStripeSessionOrders = async (sessionId) => {
-  await orderModel.deleteMany({
-    paymentId: sessionId,
+const failStripeSessionOrders = async (query) => {
+  const pendingOrders = await orderModel.find({
+    ...query,
     paymentStatus: 'pending'
   })
+
+  for (const order of pendingOrders) {
+    const inventoryWasReserved = Boolean(order.inventoryReserved)
+    const claimedOrder = await orderModel.findOneAndUpdate(
+      {
+        _id: order._id,
+        paymentStatus: 'pending',
+        inventoryReserved: inventoryWasReserved ? true : { $ne: true }
+      },
+      {
+        $set: {
+          paymentStatus: 'failed',
+          orderStatus: 'cancelled',
+          inventoryReserved: false
+        }
+      },
+      { returnDocument: 'after' }
+    )
+
+    if (!claimedOrder || !inventoryWasReserved) {
+      continue
+    }
+
+    try {
+      await releaseInventory(getInventoryItemsFromOrder(claimedOrder))
+    } catch (error) {
+      await orderModel.updateOne(
+        { _id: claimedOrder._id, paymentStatus: 'failed', orderStatus: 'cancelled' },
+        {
+          $set: {
+            paymentStatus: 'pending',
+            orderStatus: order.orderStatus || 'placed',
+            inventoryReserved: true
+          }
+        }
+      )
+      throw error
+    }
+  }
+}
+
+const markStripeSessionOrdersFailed = async (sessionId) => {
+  return failStripeSessionOrders({ paymentId: sessionId })
+}
+
+const cancelStripeSessionOrders = async (sessionId, userId) => {
+  return failStripeSessionOrders({ paymentId: sessionId, userId })
 }
 
 const getStripeSessionStatus = async (sessionId) => {

@@ -22,6 +22,12 @@ const getUserCartItems = async (userId) => {
       const productDocument = await findProductBySlug(item.productSlug)
       const product = productDocument ? mapProductToStorefront(productDocument) : null
 
+      if (product && item.price !== product.price) {
+        item.price = product.price
+        item.totalPrice = Number((product.price * item.quantity).toFixed(2))
+        await item.save()
+      }
+
       return mapCartItem(item, normalizeStock(product?.stock), normalizeMaxPerOrder(product?.maxPerOrder))
     })
   )
@@ -44,6 +50,14 @@ const getCartCount = asyncHandler(async (req, res) => {
 
 const addCartItem = asyncHandler(async (req, res) => {
   const { productId, quantity = 1 } = req.body
+
+  if (typeof productId !== 'string' || !productId.trim()) {
+    throw new AppError('A valid product is required', 400)
+  }
+
+  if (!Number.isInteger(Number(quantity)) || Number(quantity) < 1) {
+    throw new AppError('Quantity must be a positive whole number', 400)
+  }
   const productDocument = await findProductBySlug(productId)
   const product = productDocument ? mapProductToStorefront(productDocument) : null
 
@@ -64,6 +78,7 @@ const addCartItem = asyncHandler(async (req, res) => {
     assertQuantityAvailable(product, updatedQuantity)
 
     existingItem.quantity = updatedQuantity
+    existingItem.price = product.price
     existingItem.totalPrice = Number(
       (existingItem.quantity * existingItem.price).toFixed(2)
     )
@@ -91,6 +106,10 @@ const addCartItem = asyncHandler(async (req, res) => {
 
 const updateCartItem = asyncHandler(async (req, res) => {
   const { quantity } = req.body
+
+  if (!Number.isInteger(Number(quantity)) || Number(quantity) < 0) {
+    throw new AppError('Quantity must be a non-negative whole number', 400)
+  }
   const nextQuantity = Math.max(0, Number(quantity) || 0)
 
   const cartItem = await cartModel.findOne({
@@ -115,6 +134,7 @@ const updateCartItem = asyncHandler(async (req, res) => {
     assertQuantityAvailable(product, nextQuantity)
 
     cartItem.quantity = nextQuantity
+    cartItem.price = product.price
     cartItem.totalPrice = Number((cartItem.price * nextQuantity).toFixed(2))
     await cartItem.save()
   }
@@ -131,6 +151,14 @@ const removeCartItem = asyncHandler(async (req, res) => {
 
   const cart = await getUserCartItems(req.user._id)
   res.status(200).json(cart)
+})
+
+const clearCart = asyncHandler(async (req, res) => {
+  await cartModel.deleteMany({ userId: req.user._id })
+  res.status(200).json({
+    items: [],
+    summary: await calculateCartSummary([])
+  })
 })
 
 const checkoutCart = asyncHandler(async (req, res) => {
@@ -155,5 +183,6 @@ module.exports = {
   addCartItem,
   updateCartItem,
   removeCartItem,
+  clearCart,
   checkoutCart
 }
