@@ -5,8 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "test": "node --test",
-    "dev": "node --watch src/server.js",
-    "start": "node src/server.js",
+    "dev": "node init && node --watch src/server.js",
+    "start": "node init && node src/server.js",
     "catalog:sync": "node scripts/sync-catalog.js",
     "check:cod-flow": "node scripts/check-shopper-flow.js",
     "check:socket": "node scripts/check-socket.js",

@@ -16,6 +16,7 @@ import {
   clearStoredAuthUser,
   completeGoogleLogin,
   fetchCurrentUser,
+  getRefreshToken,
   getStoredAuthUser,
   logoutUser,
   storeAuthUser,
@@ -174,6 +175,13 @@ const App = () => {
           })
         )
         clearGoogleAuthParams(url)
+        setIsBootstrappingAuth(false)
+        return
+      }
+
+      if (googleAuthStatus !== "success" && !getRefreshToken()) {
+        clearStoredAuthUser()
+        setCurrentUser(null)
         setIsBootstrappingAuth(false)
         return
       }

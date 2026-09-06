@@ -337,7 +337,7 @@ export function LoginForm({
                   </Button>
                 </Field>
               ) : null}
-              <FieldDescription className="space-y-3 text-center">
+              <div className="space-y-3 text-center text-sm leading-normal font-normal text-muted-foreground">
                 {mode === "login" ? (
                   <>
                     <button
@@ -413,7 +413,7 @@ export function LoginForm({
                     Back to store
                   </button>
                 ) : null}
-              </FieldDescription>
+              </div>
             </FieldGroup>
           </form>
         </CardContent>

@@ -264,7 +264,8 @@ authApi.interceptors.response.use(
       error.response?.status !== 401 ||
       !originalRequest ||
       originalRequest._retry ||
-      shouldSkipRefresh
+      shouldSkipRefresh ||
+      !getRefreshToken()
     ) {
       return Promise.reject(error)
     }
